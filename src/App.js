@@ -166,7 +166,7 @@ export default function App() {
 
     const { error } = await supabase.from('inventar').insert([{
       artikel: newArtikelKat,
-      groesse: newGroesse || null, // Wenn leer gelassen, wird NULL in der DB gespeichert (z.B. bei Koppel oft keine Größe nötig)
+      groesse: newGroesse || null, // Wenn leer gelassen, wird NULL in der DB gespeichert
       zustand: newZustand,
       status: 'Frei' // Neue Teile stehen sofort zur Leihe im Kleiderkammer-Pool bereit
     }]);
@@ -218,8 +218,7 @@ export default function App() {
     }
   }
 
-  // Löscht ein Kind mitsamt Kaskadierung. Supabase entfernt durch gesetzte Foreign Key-Bedingungen automatisch 
-  // die Zuweisungen und setzt die verknüpften Lagerteile im Trigger wieder auf 'Frei'.
+  // Löscht ein Kind mitsamt Kaskadierung.
   async function handleDeletetCadett(cadett) {
     const ersteAbfrage = window.confirm(`Kind löschen?\nMöchtest du ${cadett.vorname} ${cadett.nachname} wirklich aus dem System entfernen?`);
     if (!ersteAbfrage) return;
@@ -248,7 +247,6 @@ export default function App() {
       return; 
     }
 
-    // Vorbereitung des Payload-Objekts für die 'ausgaben'-Tabelle in Supabase
     const insertData = {
       cadetten_id: selectedCadett.id,
       kategorie_soll: kategorie,
@@ -270,7 +268,6 @@ export default function App() {
     await supabase.from('cadetten').update({ empfang_bestaetigt: false }).eq('id', selectedCadett.id);
     setSelectedCadett(prev => ({ ...prev, empfang_bestaetigt: false }));
 
-    // Log-Meldung generieren je nachdem, welcher der 3 Ausgabe-Modi genutzt wurde
     let logDetail = `Zuweisung für ${selectedCadett.vorname}: ${kategorie}`;
     if (typ === 'lager') logDetail += ` (Lager-ID: ${selectedTeilId})`;
     if (typ === 'selbst') logDetail += ` (Selbst beschafft)`;
@@ -278,7 +275,6 @@ export default function App() {
     
     await logAction("Teil ausgegeben", `${logDetail} - Eltern-Quittung wurde automatisch storniert.`);
     
-    // UI-Zustand aufräumen und alle Listen neu puffern
     setShowAusgabeModal(false); 
     setSelectedTeilId('');     
     fetchAusgaben(selectedCadett.id); 
@@ -287,7 +283,7 @@ export default function App() {
     fetchAllAusgaben();
   }
 
-  // Nimmt ein Kleidungsstück zurück (löscht die Zuweisung in der DB, wodurch das Lagerteil automatisch wieder frei wird)
+  // Nimmt ein Kleidungsstück zurück
   async function handleRueckgabe(ausgabeId, kategorie, inventarId) {
     const bestaetigung = window.confirm(`Möchtest du das Teil für "${kategorie}" wirklich als zurückgegeben markieren?`);
     if (!bestaetigung) return;
@@ -295,7 +291,6 @@ export default function App() {
     const { error } = await supabase.from('ausgaben').delete().eq('id', ausgabeId);
     
     if (!error) {
-      // Auch bei einer Rückgabe/Stornierung erlischt die Gültigkeit der alten digitalen Elternquittung
       await supabase.from('cadetten').update({ empfang_bestaetigt: false }).eq('id', selectedCadett.id);
       setSelectedCadett(prev => ({ ...prev, empfang_bestaetigt: false }));
 
@@ -314,23 +309,18 @@ export default function App() {
   function generatePDF(cadett, aktuelleAusgaben) {
     const doc = new jsPDF();
     
-    // Dekorativer roter Header-Balken der Ehrengarde am oberen Papierrand
     doc.setFillColor(196, 18, 48); 
     doc.rect(20, 15, 170, 3, 'F');
     
-    // Dokumenten-Titel und Metadaten des Belegs
     doc.setFont("Helvetica", "bold"); doc.setFontSize(22); doc.text("Beleg: Uniformen-Ausgabe", 20, 30);
     doc.setFont("Helvetica", "normal"); doc.setFontSize(11);
     doc.text(`Cadett: ${cadett.vorname} ${cadett.nachname}`, 20, 45);
     doc.text(`Datum: ${new Date().toLocaleDateString('de-DE')}`, 20, 52);
-    doc.setLineWidth(0.5); doc.line(20, 58, 190, 58); // Horizontale Trennlinie
+    doc.setLineWidth(0.5); doc.line(20, 58, 190, 58); 
     
-    // Tabelle / Listenausgabe der Ausstattung
     doc.setFont("Helvetica", "bold"); doc.text("Aktueller Ausstattungs-Status:", 20, 68);
     doc.setFont("Helvetica", "normal"); let yPos = 78;
     
-    // Die Schleife läuft automatisch durch alle Kategorien aus 'SOLL_KATEGORIEN'.
-    // Jedes neue Teil (wie Hut oder Stiefel) wird hierdurch automatisch auf das PDF gedruckt!
     SOLL_KATEGORIEN.forEach((kat) => {
       const geliehen = aktuelleAusgaben.find(a => a.kategorie_soll === kat);
       if (geliehen) {
@@ -345,27 +335,22 @@ export default function App() {
           doc.text(`[X] ${kat}: Vereinslager ID: ${geliehen.inventar_id}${info?.groesse ? ` (Größe: ${info.groesse})` : ''}`, 25, yPos);
         }
       } else doc.text(`[ ] ${kat}: Offen / Noch nicht ausgegeben`, 25, yPos);
-      yPos += 9; // Zeilenabstand nach unten verschieben
+      yPos += 9; 
     });
     
-    // Rechtliche Hinweise, Satzungs-Klauseln und Mietgebühren
     yPos += 8; doc.setFont("Helvetica", "bold"); doc.text("Rechtliche Einverständniserklärung & Miete:", 20, yPos);
     doc.setFont("Helvetica", "normal"); doc.setFontSize(9);
     const rechtstext = "Die Uniformen-Miete beträgt pauschal 150,00 € pro Saison. Die Datenhaltung wurde elektronisch bewilligt.";
     doc.text(doc.splitTextToSize(rechtstext, 170), 20, yPos + 6);
     
-    // Nachweis der digitalen Signaturen / Haken aus der Web-App
     doc.setFontSize(10); 
     doc.text(`Datenschutz (DSGVO): ${cadett.dsgvo_bestaetigt ? 'ERTEILT (Digital hinterlegt)' : 'OFFEN / AUSSTEHEND'}`, 20, yPos + 25);
     doc.text(`Übergabe-Quittung Eltern: ${cadett.empfang_bestaetigt ? 'BESTÄTIGT (Vor Ort digital autorisiert)' : 'OFFEN / AUSSTEHEND'}`, 20, yPos + 32);
     
     logAction("PDF generiert", `Beleg-PDF für ${cadett.vorname} ${cadett.nachname} aufgerufen.`);
-    
-    // Öffnet das fertig berechnete PDF direkt in einem neuen Browser-Tab zum Drucken
     doc.output('dataurlnewwindow');
   }
 
-  // Hilfsfunktion: Berechnet den Textbaustein für das Zähler-Verhältnis (z.B. "3 / 8") in der Hauptliste
   function getAusstattungsStatus(cadettId) {
     return `${allAusgaben.filter(a => a.cadetten_id === cadettId).length} / ${SOLL_KATEGORIEN.length}`;
   }
@@ -385,9 +370,32 @@ export default function App() {
     );
   }
 
-  // Hilfsvariablen für die Modalausgabe (Filtert Teile, die exakt zur Kategorie passen und den Zustand 'Frei'/'Free' aufweisen)
   const freieTeileFuerKategorie = inventar.filter(i => i.artikel === activeKategorie && (i.status === 'Frei' || i.status === 'Free'));
   const istVollstaendigBestaetigt = selectedCadett?.dsgvo_bestaetigt && selectedCadett?.empfang_bestaetigt;
+
+  // =========================================================================
+  // NEU: DYNAMISCHE FILTER-ERMITTLUNG AUS DER DATENBANK
+  // =========================================================================
+  
+  // 1. Alle real existierenden Größen aus dem geladenen Inventar extrahieren
+  const existierendeGroessen = [
+    'Alle',
+    ...new Set(
+      inventar
+        .map(item => item.groesse ? item.groesse.trim() : '') // Leerzeichen entfernen
+        .filter(g => g !== '')                                // Zeilen ohne Größenangabe ignorieren
+    )
+  ].sort(); // Alphabetisch/numerisch sortieren für eine saubere Optik im UI
+
+  // 2. Alle real existierenden Zustände aus dem geladenen Inventar extrahieren
+  const existierendeZustaende = [
+    'Alle',
+    ...new Set(
+      inventar
+        .map(item => item.zustand ? item.zustand.trim() : '')
+        .filter(z => z !== '')
+    )
+  ].sort();
 
   // =========================================================================
   // VIEW-RENDERING 2: HAUPT-APP (MOBILE FIRST CONTAINER - MAX 480PX WIDTH)
@@ -395,7 +403,7 @@ export default function App() {
   return (
     <div style={{ fontFamily: 'sans-serif', padding: '15px', maxWidth: '480px', margin: '0 auto', backgroundColor: COLORS.appBackground, minHeight: '100vh', color: COLORS.textDark }}>
       
-      {/* Oberste Statuszeile mit angemeldetem User und Logout-Button */}
+      {/* Statuszeile */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: COLORS.textMuted, marginBottom: '12px', padding: '0 5px' }}>
         <span>👤 Zeugmeister: <strong style={{ color: COLORS.textDark }}>{currentBetreuer}</strong></span>
         <button onClick={() => setCurrentBetreuer('')} style={{ background: 'none', border: 'none', color: COLORS.primaryRed, cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>Wechseln</button>
@@ -408,10 +416,9 @@ export default function App() {
         <button onClick={() => setView('logs')} style={{ flex: 1, padding: '10px', background: view === 'logs' ? COLORS.pureWhite : 'transparent', color: view === 'logs' ? COLORS.primaryRed : COLORS.pureWhite, border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>📋 Protokoll</button>
       </div>
 
-      {/* TAB A: CADETTEN - HAUPTLISTE (WENN KEIN KIND SELEKTIERT IST) */}
+      {/* TAB A: CADETTEN - HAUPTLISTE */}
       {view === 'cadetten' && !selectedCadett && (
         <div>
-          {/* Eingabeformular für Neuregistrierung eines Kindes */}
           <h3 style={{ fontSize: '16px', color: COLORS.primaryRed, borderBottom: `2px solid ${COLORS.primaryRed}`, paddingBottom: '5px' }}>Neuen Cadetten eintragen</h3>
           <form onSubmit={handleAddCadett} style={{ display: 'flex', gap: '8px', marginBottom: '25px', marginTop: '10px' }}>
             <input type="text" placeholder="Vorname" value={newVorname} onChange={e => setNewVorname(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '6px', border: `1px solid ${COLORS.borderLight}` }} />
@@ -419,7 +426,6 @@ export default function App() {
             <button type="submit" style={{ background: COLORS.primaryRed, color: COLORS.pureWhite, border: 'none', padding: '10px 16px', borderRadius: '6px', fontWeight: 'bold' }}>+</button>
           </form>
 
-          {/* Auflistung aller erfassten Kinder */}
           <h3 style={{ fontSize: '16px', marginBottom: '10px' }}>Aktive Cadetten</h3>
           {cadetten.map(c => (
             <div key={c.id} onClick={() => setSelectedCadett(c)} style={{ background: COLORS.pureWhite, padding: '14px', borderRadius: '8px', marginBottom: '10px', cursor: 'pointer', borderLeft: `4px solid ${COLORS.primaryRed}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -427,7 +433,6 @@ export default function App() {
                 <strong style={{ fontSize: '15px' }}>{c.vorname} {c.nachname}</strong>
                 <div style={{ fontSize: '12px', color: COLORS.textMuted }}>Ausrüstung: <span style={{ fontWeight: 'bold', color: COLORS.primaryRed }}>{getAusstattungsStatus(c.id)}</span></div>
               </div>
-              {/* Visuelle Haken-Badges direkt in der Zeile für schnellen administrativen Überblick */}
               <div style={{ display: 'flex', gap: '4px' }}>
                 <span style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '10px', fontWeight: 'bold', background: c.dsgvo_bestaetigt ? COLORS.statusGreenBg : '#FFF5F5', color: c.dsgvo_bestaetigt ? COLORS.statusGreen : COLORS.primaryRed }}>DSGVO</span>
                 <span style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '10px', fontWeight: 'bold', background: c.empfang_bestaetigt ? COLORS.statusGreenBg : '#FFF5F5', color: c.empfang_bestaetigt ? COLORS.statusGreen : COLORS.primaryRed }}>Quittung</span>
@@ -437,18 +442,16 @@ export default function App() {
         </div>
       )}
 
-      {/* TAB A-DET: CADETTEN - DETAILANSICHT (FÜR EIN SPEZIFISCHES KIND) */}
+      {/* TAB A-DET: CADETTEN - DETAILANSICHT */}
       {view === 'cadetten' && selectedCadett && (
         <div style={{ background: COLORS.pureWhite, padding: '20px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-          {/* Header-Aktionen der Detailkarte */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <button onClick={() => setSelectedCadett(null)} style={{ background: 'none', border: 'none', color: COLORS.primaryRed, cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>... Übersicht</button>
+            <button onClick={() => setSelectedCadett(null)} style={{ background: 'none', border: 'none', color: COLORS.primaryRed, cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>← Übersicht</button>
             <button onClick={() => handleDeletetCadett(selectedCadett)} style={{ background: 'none', border: 'none', color: COLORS.textMuted, cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>🗑️ Kind löschen</button>
           </div>
           
           <h2 style={{ margin: '15px 0 4px 0', color: COLORS.primaryRed }}>{selectedCadett.vorname} {selectedCadett.nachname}</h2>
 
-          {/* Bereich für die beiden großen Kontroll-Checkboxen (Rechtliches & Quittungen) */}
           <div style={{ background: '#F7FAFC', padding: '12px', borderRadius: '8px', margin: '15px 0', border: `1px solid ${COLORS.borderLight}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '10px', marginBottom: '10px', borderBottom: `1px solid ${COLORS.borderLight}` }}>
               <div>
@@ -461,13 +464,12 @@ export default function App() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <span style={{ fontSize: '13px', fontWeight: 'bold' }}>2. Übergabe-Quittung</span>
-                <div style={{ fontSize: '11px', color: COLORS.textMuted }}>Eltern bestätigen Erhalt der geliehenen Teile</div>
+                <div style={{ fontSize: '11px', color: COLORS.textMuted }}>Eltern haben den Erhalt digital bestätigt</div>
               </div>
               <input type="checkbox" checked={selectedCadett.empfang_bestaetigt || false} onChange={() => toggleEmpfang(selectedCadett)} style={{ width: '22px', height: '22px', cursor: 'pointer', accentColor: COLORS.statusGreen }} />
             </div>
           </div>
 
-          {/* Das dynamische Zuweisungs-Register (Iteriert über SOLL_KATEGORIEN) */}
           <h3 style={{ fontSize: '14px', marginBottom: '10px', textTransform: 'uppercase', color: COLORS.textMuted }}>Soll-Ausstattung</h3>
           {SOLL_KATEGORIEN.map(kat => {
             const geliehen = ausgaben.find(a => a.kategorie_soll === kat);
@@ -477,11 +479,9 @@ export default function App() {
             return (
               <div key={kat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 0', borderBottom: `1px solid ${COLORS.borderLight}` }}>
                 <div>
-                  {/* Status-Indikator: Roter Punkt = Zugewiesen, Weißer Punkt = Noch offen */}
                   <span style={{ marginRight: '10px' }}>{geliehen ? '🔴' : '⚪'}</span>
                   <strong style={{ fontSize: '14px' }}>{kat}</strong>
                   
-                  {/* Bedingte Text-Labels je nachdem welcher Inventar-Typ vorliegt */}
                   {geliehen && !istSelbstBeschafft && !istNichtBenoetigt && <span style={{ marginLeft: '6px', color: COLORS.textMuted, fontSize: '11px' }}>[ID: {geliehen.inventar_id}]</span>}
                   {istNichtBenoetigt && <span style={{ marginLeft: '6px', color: COLORS.textMuted, fontSize: '11px', fontStyle: 'italic' }}>(Nicht benötigt)</span>}
                   {istSelbstBeschafft && <span style={{ marginLeft: '6px', color: COLORS.textMuted, fontSize: '11px', fontStyle: 'italic' }}>(Selbst beschafft)</span>}
@@ -499,24 +499,23 @@ export default function App() {
             );
           })}
           
-          {/* Großer Beleg-Aktionsbutton am Fußende der Karte */}
           <button onClick={() => generatePDF(selectedCadett, ausgaben)} style={{ width: '100%', marginTop: '25px', background: istVollstaendigBestaetigt ? COLORS.textDark : COLORS.warningOrange, color: COLORS.pureWhite, border: 'none', padding: '12px', borderRadius: '6px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer' }}>
             {istVollstaendigBestaetigt ? '📄 PDF Beleg erzeugen (Alles OK)' : '⚠️ PDF erzeugen (Haken fehlen noch!)'}
           </button>
         </div>
       )}
 
-      {/* TAB B: LAGERBESTAND (MIT KLICK-FILTERN UND SCHNELLERFASSUNG) */}
+      {/* TAB B: LAGERBESTAND (MIT DYNAMISCHEN FILTER-BUTTONS) */}
       {view === 'inventar' && (
         <div>
-          {/* Schnellerfassungs-Eingabemaske für neue Bekleidung im Lager */}
+          {/* Schnellerfassung */}
           <h3 style={{ fontSize: '16px', color: COLORS.primaryRed, borderBottom: `2px solid ${COLORS.primaryRed}`, paddingBottom: '5px' }}>Neues Uniformteil erfassen</h3>
           <form onSubmit={handleAddInventar} style={{ background: COLORS.pureWhite, padding: '12px', borderRadius: '8px', marginBottom: '20px', marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', gap: '6px' }}>
               <select value={newArtikelKat} onChange={e => setNewArtikelKat(e.target.value)} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: `1px solid ${COLORS.borderLight}`, fontSize: '13px' }}>
                 {SOLL_KATEGORIEN.map(kat => <option key={kat} value={kat}>{kat}</option>)}
               </select>
-              <input type="text" placeholder="Größe (z.B. 38, M)" value={newGroesse} onChange={e => setNewGroesse(e.target.value)} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: `1px solid ${COLORS.borderLight}`, fontSize: '13px' }} />
+              <input type="text" placeholder="Größe (z.B. M)" value={newGroesse} onChange={e => setNewGroesse(e.target.value)} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: `1px solid ${COLORS.borderLight}`, fontSize: '13px' }} />
             </div>
             <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               <select value={newZustand} onChange={e => setNewZustand(e.target.value)} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: `1px solid ${COLORS.borderLight}`, fontSize: '13px' }}>
@@ -530,10 +529,10 @@ export default function App() {
 
           <h3 style={{ fontSize: '16px', marginBottom: '12px' }}>Lagerbestand ({inventar.length} Teile)</h3>
           
-          {/* DIE NEUE KLICK-FILTERBOX (ERSETZT FREITEXT-SUCHE GEGEN SCHNELLE RADIAL-BUTTONS) */}
+          {/* FILTERBOX (NUR DYNAMISCHE STRINGS DIREKT AUS DER DATENBANK) */}
           <div style={{ background: COLORS.pureWhite, padding: '12px', borderRadius: '8px', marginBottom: '15px', display: 'flex', flexDirection: 'column', gap: '10px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
             
-            {/* Filter-Kriterium 1: Kategorie (Dropdown) */}
+            {/* Kategorie */}
             <div>
               <label style={{ fontSize: '11px', fontWeight: 'bold', color: COLORS.textMuted, display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Kategorie</label>
               <select value={lagerFilter} onChange={e => setLagerFilter(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: `1px solid ${COLORS.borderLight}`, fontSize: '13px', fontWeight: 'bold' }}>
@@ -542,30 +541,30 @@ export default function App() {
               </select>
             </div>
 
-            {/* Filter-Kriterium 2: Größe (Scrollbare Button-Leiste für schnellen Daumen-Klick) */}
+            {/* Größe: ANPASSUNG -> Rendert jetzt dynamisch nur existierende Einträge aus 'existierendeGroessen' */}
             <div>
               <label style={{ fontSize: '11px', fontWeight: 'bold', color: COLORS.textMuted, display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Größe</label>
               <div style={{ display: 'flex', gap: '5px', overflowX: 'auto', paddingBottom: '3px' }}>
-                {['Alle', 'S', 'M', 'L', 'XL', '36', '38', '40', '42'].map(g => {
+                {existierendeGroessen.map(g => {
                   const istAktiv = groessenFilter === g;
                   return (
-                    <button key={g} type="button" onClick={() => setGroessenFilter(g)} style={{ padding: '5px 10px', borderRadius: '4px', border: istAktiv ? 'none' : `1px solid ${COLORS.borderLight}`, background: istAktiv ? COLORS.primaryRed : COLORS.appBackground, color: istAktiv ? COLORS.pureWhite : COLORS.textDark, fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                      {g}
+                    <button key={g} type="button" onClick={() => setGroessenFilter(g)} style={{ padding: '5px 12px', borderRadius: '4px', border: istAktiv ? 'none' : `1px solid ${COLORS.borderLight}`, background: istAktiv ? COLORS.primaryRed : COLORS.appBackground, color: istAktiv ? COLORS.pureWhite : COLORS.textDark, fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      {g === 'Alle' ? 'Alle' : g}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Filter-Kriterium 3: Physischer Zustand */}
+            {/* Zustand: ANPASSUNG -> Rendert jetzt dynamisch nur existierende Einträge aus 'existierendeZustaende' */}
             <div>
               <label style={{ fontSize: '11px', fontWeight: 'bold', color: COLORS.textMuted, display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Zustand</label>
-              <div style={{ display: 'flex', gap: '5px' }}>
-                {['Alle', 'Neu', 'Sehr Gut', 'Gebraucht'].map(z => {
+              <div style={{ display: 'flex', gap: '5px', overflowX: 'auto', paddingBottom: '3px' }}>
+                {existierendeZustaende.map(z => {
                   const istAktiv = zustandFilter === z;
                   return (
-                    <button key={z} type="button" onClick={() => setZustandFilter(z)} style={{ flex: 1, padding: '5px 8px', borderRadius: '4px', border: istAktiv ? 'none' : `1px solid ${COLORS.borderLight}`, background: istAktiv ? COLORS.textDark : COLORS.appBackground, color: istAktiv ? COLORS.pureWhite : COLORS.textDark, fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}>
-                      {z}
+                    <button key={z} type="button" onClick={() => setZustandFilter(z)} style={{ flex: 1, minWidth: '60px', padding: '5px 8px', borderRadius: '4px', border: istAktiv ? 'none' : `1px solid ${COLORS.borderLight}`, background: istAktiv ? COLORS.textDark : COLORS.appBackground, color: istAktiv ? COLORS.pureWhite : COLORS.textDark, fontSize: '11px', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      {z === 'Alle' ? 'Alle' : z}
                     </button>
                   );
                 })}
@@ -574,11 +573,10 @@ export default function App() {
 
           </div>
 
-          {/* Ausgabe der gefilterten Lager-Ergebnisse */}
+          {/* Anzeige Ergebnisse */}
           <div style={{ maxHeight: '45vh', overflowY: 'auto', background: COLORS.pureWhite, padding: '8px', borderRadius: '8px' }}>
             {inventar
               .filter(item => {
-                // Verschachtelte Filter-Prüfung: Nur Datensätze, die alle drei Bedingungen erfüllen, passieren
                 const passtKategorie = lagerFilter === 'Alle' || item.artikel === lagerFilter;
                 const passtGroesse = groessenFilter === 'Alle' || (item.groesse && item.groesse.toUpperCase() === groessenFilter.toUpperCase());
                 const passtZustand = zustandFilter === 'Alle' || item.zustand === zustandFilter;
@@ -591,12 +589,10 @@ export default function App() {
                       <span style={{ fontSize: '11px', background: COLORS.appBackground, padding: '2px 6px', marginRight: '8px', borderRadius: '4px' }}>{item.id}</span>
                       <strong>{item.artikel}</strong>
                     </div>
-                    {/* Statusmeldung: Frei (grün) vs. Ausgeliehen (rot) */}
                     <span style={{ color: item.status === 'Frei' || item.status === 'Free' ? COLORS.statusGreen : COLORS.primaryRed, fontWeight: 'bold', fontSize: '12px' }}>
                       {item.status}
                     </span>
                   </div>
-                  {/* Erweiterte Detailanzeige für Größe und Zustand unterhalb des Artikeltitels */}
                   <div style={{ fontSize: '11px', color: COLORS.textMuted, marginLeft: '45px' }}>
                     {item.groesse && <span style={{ marginRight: '10px' }}>📏 Gr: {item.groesse}</span>}
                     {item.zustand && <span>✨ {item.zustand}</span>}
@@ -604,7 +600,7 @@ export default function App() {
                 </div>
               ))}
 
-            {/* Leermeldung falls kein Lagergegenstand auf die Filter-Kombination zutrifft */}
+            {/* Fallback */}
             {inventar.filter(item => {
               const passtKategorie = lagerFilter === 'Alle' || item.artikel === lagerFilter;
               const passtGroesse = groessenFilter === 'Alle' || (item.groesse && item.groesse.toUpperCase() === groessenFilter.toUpperCase());
@@ -619,7 +615,7 @@ export default function App() {
         </div>
       )}
 
-      {/* TAB C: REVISIONSLOGS (PROTOKOLL-ANZEIGE) */}
+      {/* TAB C: REVISIONSLOGS */}
       {view === 'logs' && (
         <div>
           <h3 style={{ fontSize: '16px', marginBottom: '10px' }}>📋 Revisionsprotokoll</h3>
@@ -638,19 +634,17 @@ export default function App() {
         </div>
       )}
 
-      {/* OVERLAY / DIALOG-MODAL: KLEIDUNG AUSGEBEN (WIRD BEI KLICK AUF 'AUSGEBEN' AKTIVIERT) */}
+      {/* MODAL: KLEIDUNG AUSGEBEN */}
       {showAusgabeModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', zIndex: 1000 }}>
           <div style={{ background: COLORS.pureWhite, padding: '20px', borderRadius: '12px', width: '100%', maxWidth: '350px' }}>
             <h3 style={{ marginTop: 0, color: COLORS.primaryRed }}>{activeKategorie} ausgeben</h3>
             
-            {/* Dropdown zur Selektion einer konkreten, freien Lager-ID */}
             <select value={selectedTeilId} onChange={e => setSelectedTeilId(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', marginBottom: '18px' }}>
               <option value="">-- Lagerstück wählen --</option>
               {freieTeileFuerKategorie.map(i => <option key={i.id} value={i.id}>ID: {i.id} {i.groesse ? `(Gr. ${i.groesse})` : ''}</option>)}
             </select>
             
-            {/* Die drei unterschiedlichen Ausgabe-Strategie-Buttons */}
             <button onClick={() => handleAusgabeSpeichern(activeKategorie, 'lager')} disabled={!selectedTeilId} style={{ width: '100%', padding: '11px', background: selectedTeilId ? COLORS.primaryRed : COLORS.textMuted, color: COLORS.pureWhite, border: 'none', borderRadius: '6px', marginBottom: '8px', fontWeight: 'bold' }}>Aus Lager zuweisen</button>
             <button onClick={() => handleAusgabeSpeichern(activeKategorie, 'selbst')} style={{ width: '100%', padding: '11px', background: COLORS.pureWhite, color: COLORS.statusGreen, border: `1px solid ${COLORS.statusGreen}`, borderRadius: '6px', marginBottom: '8px', fontWeight: 'bold' }}>"Selbst beschafft"</button>
             <button onClick={() => handleAusgabeSpeichern(activeKategorie, 'nicht_benoetigt')} style={{ width: '100%', padding: '11px', background: COLORS.appBackground, color: COLORS.textDark, border: 'none', borderRadius: '6px', marginBottom: '18px', fontWeight: 'bold' }}>Wird nicht benötigt</button>
