@@ -4,7 +4,8 @@ import { Users, Package, FileText, Check, X, Plus, Trash2, Download, History, Us
 import { jsPDF } from 'jspdf';
 
 // --- SYSTEMKONFIGURATION ---
-const SOLL_KATEGORIEN = ['Barret', 'Koppel', 'Uniformjacke', 'Mantel', 'Rock'];
+// ANPASSUNG 1: Liste der Kategorien um 'Hut', 'Schulterstücke' und 'Stiefel' erweitert
+const SOLL_KATEGORIEN = ['Hut', 'Barret', 'Uniformjacke', 'Schulterstücke', 'Koppel', 'Mantel', 'Rock', 'Stiefel'];
 const BETREUER_LISTE = ['Anja', 'Claudia', 'Ronny', 'Simone', 'Tina']; 
 
 const COLORS = {
@@ -40,6 +41,15 @@ export default function App() {
 
   const [newVorname, setNewVorname] = useState('');     
   const [newNachname, setNewNachname] = useState('');   
+
+  // ANPASSUNG 4: Neue States für die Filterung und Detailsuche im Lagerbestand
+  const [lagerFilter, setLagerFilter] = useState('Alle');
+  const [lagerSuchbegriff, setLagerSuchbegriff] = useState('');
+
+  // ANPASSUNG 2: Neue States für das Hinzufügen von neuen Uniformteilen ins Lager
+  const [newArtikelKat, setNewArtikelKat] = useState(SOLL_KATEGORIEN[0]);
+  const [newGroesse, setNewGroesse] = useState('');
+  const [newZustand, setNewZustand] = useState('Neu');
 
   useEffect(() => {
     if (currentBetreuer) {
@@ -99,7 +109,6 @@ export default function App() {
     e.preventDefault(); 
     if (!newVorname || !newNachname) return; 
     
-    // Spalte 'empfang_bestaetigt' wird jetzt sauber miterzeugt
     const { error } = await supabase.from('cadetten').insert([{ 
       vorname: newVorname, 
       nachname: newNachname, 
@@ -112,6 +121,28 @@ export default function App() {
       setNewVorname('');
       setNewNachname('');
       fetchCadetten(); 
+    }
+  }
+
+  // ANPASSUNG 2: Funktion zum Speichern eines neuen Uniformteils im Lagerbestand
+  async function handleAddInventar(e) {
+    e.preventDefault();
+    if (!newArtikelKat) return;
+
+    // Erzeugt ein neues Teil. ID wird von Supabase vergeben (oder du nutzt dort ein Textfeld)
+    const { error } = await supabase.from('inventar').insert([{
+      artikel: newArtikelKat,
+      groesse: newGroesse || null,
+      zustand: newZustand,
+      status: 'Frei' // Startet immer als verfügbar im Lager
+    }]);
+
+    if (!error) {
+      logAction("Teil ins Lager gebucht", `${newArtikelKat} (Größe: ${newGroesse || 'k.A.'}, Zustand: ${newZustand}) hinzugefügt.`);
+      setNewGroesse('');
+      fetchInventar(); // Lagerbestand-Ansicht direkt aktualisieren
+    } else {
+      alert(`Fehler beim Hinzufügen: ${error.message}`);
     }
   }
 
@@ -130,9 +161,6 @@ export default function App() {
     }
   }
 
-  // =========================================================
-  // BEHOBEN: DIE ÜBERGABE-ANZEIGE SPEICHERT & AKTUALISIERT JETZT KORREKT
-  // =========================================================
   async function toggleEmpfang(cadett) {
     if (cadett.empfang_bestaetigt) {
       const cancel = window.confirm("Möchtest du die Empfangsbestätigung wirklich zurücksetzen?");
@@ -140,19 +168,14 @@ export default function App() {
     }
 
     const neuerStatus = !cadett.empfang_bestaetigt;
-    
-    // Feuert gegen die neue Spalte 'empfang_bestaetigt' in der Datenbank
     const { error } = await supabase.from('cadetten').update({ empfang_bestaetigt: neuerStatus }).eq('id', cadett.id);
     
     if (!error) {
       logAction(neuerStatus ? "Empfang quittiert" : "Empfang storniert", `Erziehungsberechtigte von ${cadett.vorname} ${cadett.nachname} haben den Erhalt digital bestätigt.`);
-      
       await fetchCadetten();
-      
-      // Zustand des ausgewählten Kindes explizit erzwingen, damit UI sofort reagiert
       setSelectedCadett(prev => ({ ...prev, empfang_bestaetigt: neuerStatus }));
     } else {
-      alert(`Fehler beim Aktualisieren der Quittung: ${error.message}\n(Bitte prüfe, ob die Spalte in Supabase existiert und der API-Cache neu geladen wurde!)`);
+      alert(`Fehler beim Aktualisieren der Quittung: ${error.message}`);
     }
   }
 
@@ -177,9 +200,6 @@ export default function App() {
     }
   }
 
-  // =========================================================
-  // NEU: ANPASSUNG BEI AUSGABE -> ENTFERNT AUTOMATISCH DEN ELTERNHAKEN
-  // =========================================================
   async function handleAusgabeSpeichern(kategorie, typ) {
     if (typ === 'lager' && !selectedTeilId) {
       alert("Bitte wähle zuerst eine Lager-ID aus!");
@@ -202,10 +222,7 @@ export default function App() {
       return;
     }
 
-    // Da sich die Ausstattung geändert hat, setzen wir die Quittung in der DB zurück
     await supabase.from('cadetten').update({ empfang_bestaetigt: false }).eq('id', selectedCadett.id);
-
-    // Zustand im UI synchronisieren
     setSelectedCadett(prev => ({ ...prev, empfang_bestaetigt: false }));
 
     let logDetail = `Zuweisung für ${selectedCadett.vorname}: ${kategorie}`;
@@ -219,13 +236,10 @@ export default function App() {
     setSelectedTeilId('');     
     fetchAusgaben(selectedCadett.id); 
     fetchInventar();
-    fetchCadetten(); // Lädt die Hauptliste neu, damit der Quittungs-Status dort stimmt
+    fetchCadetten(); 
     fetchAllAusgaben();
   }
 
-  // =========================================================
-  // NEU: ANPASSUNG BEI RÜCKGABE -> ENTFERNT AUTOMATISCH DEN ELTERNHAKEN
-  // =========================================================
   async function handleRueckgabe(ausgabeId, kategorie, inventarId) {
     const bestaetigung = window.confirm(`Möchtest du das Teil für "${kategorie}" wirklich als zurückgegeben markieren?`);
     if (!bestaetigung) return;
@@ -233,10 +247,7 @@ export default function App() {
     const { error } = await supabase.from('ausgaben').delete().eq('id', ausgabeId);
     
     if (!error) {
-      // Auch bei Rückgabe/Änderung erlischt die Gültigkeit der alten Quittung
       await supabase.from('cadetten').update({ empfang_bestaetigt: false }).eq('id', selectedCadett.id);
-
-      // Zustand im UI synchronisieren
       setSelectedCadett(prev => ({ ...prev, empfang_bestaetigt: false }));
 
       await logAction("Teil zurückgegeben", `Rückgabe von ${selectedCadett.vorname}: ${kategorie} - Eltern-Quittung wurde automatisch storniert.`);
@@ -248,6 +259,7 @@ export default function App() {
     }
   }
 
+  // FRAGE 3: HIER BEFINDET SICH DIE PDF-GENERIERUNG, DIE DU JEDERZEIT ANPASSEN KANNST
   function generatePDF(cadett, aktuelleAusgaben) {
     const doc = new jsPDF();
     
@@ -309,7 +321,7 @@ export default function App() {
     );
   }
 
-  const freieTeileFuerKategorie = inventar.filter(i => i.artikel === activeKategorie && i.status === 'Frei');
+  const freieTeileFuerKategorie = inventar.filter(i => i.artikel === activeKategorie && (i.status === 'Frei' || i.status === 'Free'));
   const istVollstaendigBestaetigt = selectedCadett?.dsgvo_bestaetigt && selectedCadett?.empfang_bestaetigt;
 
   return (
@@ -378,6 +390,7 @@ export default function App() {
             </div>
           </div>
 
+          {/* ANPASSUNG 1: Über SOLL_KATEGORIEN iterieren. Da dort jetzt Hut, Schulterstücke und Stiefel drin liegen, tauchen sie vollautomatisch und einzeln steuerbar hier in der UI auf */}
           <h3 style={{ fontSize: '14px', marginBottom: '10px', textTransform: 'uppercase', color: COLORS.textMuted }}>Soll-Ausstattung</h3>
           {SOLL_KATEGORIEN.map(kat => {
             const geliehen = ausgaben.find(a => a.kategorie_soll === kat);
@@ -390,18 +403,13 @@ export default function App() {
                   <span style={{ marginRight: '10px' }}>{geliehen ? '🔴' : '⚪'}</span>
                   <strong style={{ fontSize: '14px' }}>{kat}</strong>
                   
-                  {/* ========================================================= */}
-                  {/* BEHOBEN: TEXTANZEIGE UND BUTTONS FÜR SELBST BESCHAFFT */}
-                  {/* ========================================================= */}
                   {geliehen && !istSelbstBeschafft && !istNichtBenoetigt && <span style={{ marginLeft: '6px', color: COLORS.textMuted, fontSize: '11px' }}>[ID: {geliehen.inventar_id}]</span>}
                   {istNichtBenoetigt && <span style={{ marginLeft: '6px', color: COLORS.textMuted, fontSize: '11px', fontStyle: 'italic' }}>(Nicht benötigt)</span>}
-                  {/* Zeigt nun auch textuell an, dass die Ausrüstung privat vorhanden ist */}
                   {istSelbstBeschafft && <span style={{ marginLeft: '6px', color: COLORS.textMuted, fontSize: '11px', fontStyle: 'italic' }}>(Selbst beschafft)</span>}
                 </div>
                 <div>
                   {geliehen ? (
                     <button onClick={() => handleRueckgabe(geliehen.id, kat, geliehen.inventar_id)} style={{ background: '#FFF5F5', color: COLORS.primaryRed, border: `1px solid ${COLORS.primaryRed}`, padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>
-                      {/* Ändert den Button-Text bei 'Selbst beschafft' zu 'Ändern' anstatt 'Rückgabe' */}
                       {istNichtBenoetigt || istSelbstBeschafft ? 'Ändern' : 'Rückgabe'}
                     </button>
                   ) : (
@@ -420,14 +428,57 @@ export default function App() {
 
       {view === 'inventar' && (
         <div>
+          {/* ANPASSUNG 2: Neues Formular zum Hinzufügen von Uniformteilen ins Lager */}
+          <h3 style={{ fontSize: '16px', color: COLORS.primaryRed, borderBottom: `2px solid ${COLORS.primaryRed}`, paddingBottom: '5px' }}>Neues Uniformteil erfassen</h3>
+          <form onSubmit={handleAddInventar} style={{ background: COLORS.pureWhite, padding: '12px', borderRadius: '8px', marginBottom: '20px', marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <select value={newArtikelKat} onChange={e => setNewArtikelKat(e.target.value)} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: `1px solid ${COLORS.borderLight}`, fontSize: '13px' }}>
+                {SOLL_KATEGORIEN.map(kat => <option key={kat} value={kat}>{kat}</option>)}
+              </select>
+              <input type="text" placeholder="Größe (z.B. 38, M)" value={newGroesse} onChange={e => setNewGroesse(e.target.value)} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: `1px solid ${COLORS.borderLight}`, fontSize: '13px' }} />
+            </div>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <select value={newZustand} onChange={e => setNewZustand(e.target.value)} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: `1px solid ${COLORS.borderLight}`, fontSize: '13px' }}>
+                <option value="Neu">Zustand: Neu</option>
+                <option value="Sehr Gut">Zustand: Sehr Gut</option>
+                <option value="Gebraucht">Zustand: Gebraucht</option>
+              </select>
+              <button type="submit" style={{ background: COLORS.statusGreen, color: COLORS.pureWhite, border: 'none', padding: '8px 16px', borderRadius: '6px', fontWeight: 'bold', fontSize: '13px', cursor: 'pointer' }}>Teil einbuchen</button>
+            </div>
+          </form>
+
           <h3 style={{ fontSize: '16px', marginBottom: '10px' }}>Lagerbestand ({inventar.length} Teile)</h3>
-          <div style={{ maxHeight: '70vh', overflowY: 'auto', background: COLORS.pureWhite, padding: '8px', borderRadius: '8px' }}>
-            {inventar.map(item => (
-              <div key={item.id} style={{ padding: '10px', borderBottom: `1px solid ${COLORS.borderLight}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
-                <div><span style={{ fontSize: '11px', background: COLORS.appBackground, padding: '2px 6px', marginRight: '8px' }}>{item.id}</span><strong>{item.artikel}</strong></div>
-                <span style={{ color: item.status === 'Free' || item.status === 'Frei' ? COLORS.statusGreen : COLORS.primaryRed, fontWeight: 'bold', fontSize: '12px' }}>{item.status}</span>
-              </div>
-            ))}
+          
+          {/* ANPASSUNG 4: Filterleiste oberhalb des Lagerbestands */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '15px' }}>
+            <select value={lagerFilter} onChange={e => setLagerFilter(e.target.value)} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: `1px solid ${COLORS.borderLight}`, fontSize: '13px', fontWeight: 'bold' }}>
+              <option value="Alle">Alle Kategorien</option>
+              {SOLL_KATEGORIEN.map(kat => <option key={kat} value={kat}>{kat}</option>)}
+            </select>
+            <input type="text" placeholder="Detailsuche (z.B. Größe)..." value={lagerSuchbegriff} onChange={e => setLagerSuchbegriff(e.target.value)} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: `1px solid ${COLORS.borderLight}`, fontSize: '13px' }} />
+          </div>
+
+          <div style={{ maxHeight: '55vh', overflowY: 'auto', background: COLORS.pureWhite, padding: '8px', borderRadius: '8px' }}>
+            {inventar
+              .filter(item => {
+                const passtKategorie = lagerFilter === 'Alle' || item.artikel === lagerFilter;
+                const suchText = lagerSuchbegriff.toLowerCase();
+                const passtDetails = item.id.toString().includes(suchText) || (item.groesse && item.groesse.toLowerCase().includes(suchText)) || (item.zustand && item.zustand.toLowerCase().includes(suchText));
+                return passtKategorie && passtDetails;
+              })
+              .map(item => (
+                <div key={item.id} style={{ padding: '10px 5px', borderBottom: `1px solid ${COLORS.borderLight}`, display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '13px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div><span style={{ fontSize: '11px', background: COLORS.appBackground, padding: '2px 6px', marginRight: '8px', borderRadius: '4px' }}>{item.id}</span><strong>{item.artikel}</strong></div>
+                    <span style={{ color: item.status === 'Frei' || item.status === 'Free' ? COLORS.statusGreen : COLORS.primaryRed, fontWeight: 'bold', fontSize: '12px' }}>{item.status}</span>
+                  </div>
+                  {/* ANPASSUNG 4: Anzeige von Zusatz-Details direkt im Listenelement */}
+                  <div style={{ fontSize: '11px', color: COLORS.textMuted, marginLeft: '45px' }}>
+                    {item.groesse && <span style={{ marginRight: '10px' }}>📏 Gr: {item.groesse}</span>}
+                    {item.zustand && <span>✨ {item.zustand}</span>}
+                  </div>
+                </div>
+              ))}
           </div>
         </div>
       )}
