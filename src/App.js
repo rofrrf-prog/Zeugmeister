@@ -7,72 +7,62 @@ import { jsPDF } from 'jspdf';
 // GLOBAL SYSTEMKONFIGURATION & FARBSCHEMA
 // =========================================================================
 
-// Definition aller Ausrüstungsgegenstände, die ein Cadett standardmäßig erhalten soll.
-// Jede Änderung hier wirkt sich automatisch auf die Zuweisung, die UI und das PDF aus.
 const SOLL_KATEGORIEN = ['Hut', 'Barret', 'Uniformjacke', 'Schulterstücke', 'Koppel', 'Mantel', 'Rock', 'Stiefel'];
-
-// Feste Liste der berechtigten Zeugmeister für das vereinfachte Login-System.
 const BETREUER_LISTE = ['Anja', 'Claudia', 'Ronny', 'Simone', 'Tina']; 
 
-// Zentrales Corporate Identity Farbschema (Ehrengarde Bonn e.V.) für konsistentes UI-Styling.
 const COLORS = {
-  primaryRed: '#C41230',        // Hauptfarbe für Buttons, Titel und CI-Elemente
-  primaryRedHover: '#A00F26',   // Dunkleres Rot für Hover-Effekte
-  softRedBg: '#FDF2F4',         // Sanfter roter Hintergrund für Warnzonen
-  pureWhite: '#FFFFFF',         // Reines Weiß für Karten und Modals
-  appBackground: '#F7FAFC',     // Neutraler, heller Hintergrund für die App
-  textDark: '#1A202C',          // Gut lesbarer, fast schwarzer Text
-  textMuted: '#718096',         // Grauton für sekundäre Texte und Beschriftungen
+  primaryRed: '#C41230',        
+  primaryRedHover: '#A00F26',   
+  softRedBg: '#FDF2F4',         
+  pureWhite: '#FFFFFF',         
+  appBackground: '#F7FAFC',     
+  textDark: '#1A202C',          
+  textMuted: '#718096',         
   borderLight: '#E2E8F0',       
-  statusGreen: '#319795',       // Petrol-Grün für positive Bestätigungen (Haken)
-  statusGreenBg: '#E6FFFA',     // Sanfter grüner Hintergrund für aktive Status-Badges
-  warningOrange: '#DD6B20',     // Orange für unvollständige Belege / Warnungen
+  statusGreen: '#319795',       
+  statusGreenBg: '#E6FFFA',     
+  warningOrange: '#DD6B20',     
   warningOrangeBg: '#FFFAF0'    
 };
 
 export default function App() {
   // =========================================================================
-  // STATE-MANAGEMENT (ZUSTANDSTEUERUNG DER APPLICATION)
+  // STATE-MANAGEMENT
   // =========================================================================
-  
-  // Navigations-State: Bestimmt, welche Hauptansicht aktiv ist ('cadetten', 'inventar', 'logs')
   const [view, setView] = useState('cadetten'); 
-  
-  // Authentifizierungs-State: Speichert den Namen des angemeldeten Zeugmeisters im RAM und LocalStorage
   const [currentBetreuer, setCurrentBetreuer] = useState(localStorage.getItem('active_betreuer') || '');
   
-  // Daten-States: Halten die synchronisierten Tabelleninhalte direkt aus der Supabase-Datenbank
-  const [cadetten, setCadetten] = useState([]);         // Alle registrierten Kinder
-  const [selectedCadett, setSelectedCadett] = useState(null); // Das aktuell in der Detailansicht geöffnete Kind
-  const [inventar, setInventar] = useState([]);         // Gesamter Lagerbestand an Uniformen
-  const [allAusgaben, setAllAusgaben] = useState([]);   // Alle getätigten Ausgaben systemweit (für Zähler-Übersicht)
-  const [ausgaben, setAusgaben] = useState([]);         // Nur die Ausgaben des aktuell ausgewählten Cadetten
-  const [logs, setLogs] = useState([]);                 // Die letzten 50 Einträge des Revisionsprotokolls
+  const [cadetten, setCadetten] = useState([]);         
+  const [selectedCadett, setSelectedCadett] = useState(null); 
+  const [inventar, setInventar] = useState([]);         
+  const [allAusgaben, setAllAusgaben] = useState([]);   
+  const [ausgaben, setAusgaben] = useState([]);         
+  const [logs, setLogs] = useState([]);                 
   
-  // Modal- & Zuweisungs-States: Steuern das Popup zur Kleiderausgabe
-  const [showAusgabeModal, setShowAusgabeModal] = useState(false); // Sichtbarkeit des Ausgabe-Dialogs
-  const [activeKategorie, setActiveKategorie] = useState('');     // Die Kategorie, die gerade vergeben wird (z.B. 'Mantel')
-  const [selectedTeilId, setSelectedTeilId] = useState('');       // Die im Dropdown gewählte konkrete Lager-ID
+  const [showAusgabeModal, setShowAusgabeModal] = useState(false); 
+  const [activeKategorie, setActiveKategorie] = useState('');     
+  const [selectedTeilId, setSelectedTeilId] = useState('');       
   
-  // Eingabe-States für Formulare: Zwischenspeicher für manuelle Tipp-Eingaben
-  const [newVorname, setNewVorname] = useState('');     // Vorname für Neuanlage Kind
-  const [newNachname, setNewNachname] = useState('');   // Nachname für Neuanlage Kind
-  const [newGroesse, setNewGroesse] = useState('');     // Textfeld für Größe bei Lager-Neuanlage (z.B. 'M', '140')
+  const [newVorname, setNewVorname] = useState('');     
+  const [newNachname, setNewNachname] = useState('');   
+  const [newGroesse, setNewGroesse] = useState('');     
 
-  // Klick-Filter-States für das Lager: Ermöglichen Filtern ohne Tastatureingabe
-  const [lagerFilter, setLagerFilter] = useState('Alle');       // Filtert nach Artikeltyp (Dropdown)
-  const [groessenFilter, setGroessenFilter] = useState('Alle');  // Filtert nach fixer Größe (Button-Leiste)
-  const [zustandFilter, setZustandFilter] = useState('Alle');    // Filtert nach Zustand (Button-Leiste)
+  const [lagerFilter, setLagerFilter] = useState('Alle');       
+  const [groessenFilter, setGroessenFilter] = useState('Alle');  
+  const [zustandFilter, setZustandFilter] = useState('Alle');    
 
-  // Eingabe-States für Lager-Erfassung
-  const [newArtikelKat, setNewArtikelKat] = useState(SOLL_KATEGORIEN[0]); // Vorausgewählte Kategorie im Formular
-  const [newZustand, setNewZustand] = useState('Neu');                  // Vorausgewählter Zustand im Formular
+  const [newArtikelKat, setNewArtikelKat] = useState(SOLL_KATEGORIEN[0]); 
+  const [newZustand, setNewZustand] = useState('Neu');                  
+
+  const [isEditingName, setIsEditingName] = useState(false);       
+  const [editVorname, setEditVorname] = useState('');               
+  const [editNachname, setEditNachname] = useState('');             
+  const [kommentarText, setKommentarText] = useState('');           
+  const [kommentarGespeichert, setKommentarGespeichert] = useState(true); 
 
   // =========================================================================
-  // SIDE EFFECTS & DATEN-FETCH-LOGIK (EIGENTLICHE SUPABASE INTERAKTION)
+  // SIDE EFFECTS & DATEN-FETCH-LOGIK
   // =========================================================================
-
-  // Sobald ein Zeugmeister eingeloggt ist, werden alle globalen Stammdaten geladen
   useEffect(() => {
     if (currentBetreuer) {
       fetchCadetten();
@@ -82,64 +72,75 @@ export default function App() {
     }
   }, [currentBetreuer]);
 
-  // Sobald ein anderes Kind angeklickt wird, laden wir dessen spezifische Ausstattungsliste nach
   useEffect(() => {
     if (selectedCadett) {
       fetchAusgaben(selectedCadett.id);
+      setKommentarText(selectedCadett.kommentar || '');
+      setKommentarGespeichert(true);
+      setIsEditingName(false);
+
+      // NEU (PUNKT 1): AUTOMATISCHES HOCHSCROLLEN BEIM ÖFFNEN / WECHSELN EINES KINDES
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [selectedCadett]);
 
-  // Universelle Logging-Funktion: Schreibt jede Aktion manipulationssicher in das audit_log der DB
   async function logAction(aktion, details) {
     await supabase.from('audit_log').insert([{
       betreuer: currentBetreuer,
       aktion: aktion,
       details: details
     }]);
-    fetchLogs(); // Aktualisiert das Protokoll-UI sofort im Hintergrund
+    fetchLogs(); 
   }
 
-  // Holt alle Kinder alphabetisch sortiert nach Vorname aus der Datenbank
   async function fetchCadetten() {
     const { data } = await supabase.from('cadetten').select('*').order('vorname', { ascending: true });
     if (data) setCadetten(data);
   }
 
-  // Lädt das gesamte Inventar für die Lagerübersicht
   async function fetchInventar() {
     const { data } = await supabase.from('inventar').select('*');
     if (data) setInventar(data);
   }
 
-  // Lädt die globale Beziehungsliste (wer hat was), um die "X / 8 Teile" Zähler in der Hauptliste zu berechnen
   async function fetchAllAusgaben() {
     const { data } = await supabase.from('ausgaben').select('*');
     if (data) setAllAusgaben(data);
   }
 
-  // Holt exakt die Ausrüstungs-Datensätze, die mit der ID des selektierten Kindes verknüpft sind
   async function fetchAusgaben(cadettId) {
     const { data } = await supabase.from('ausgaben').select('*').eq('cadetten_id', cadettId);
     if (data) setAusgaben(data);
   }
 
-  // Ruft die letzten 50 System-Aktionen für das Revisionsprotokoll ab
   async function fetchLogs() {
     const { data } = await supabase.from('audit_log').select('*').order('created_at', { ascending: false }).limit(50);
     if (data) setLogs(data);
   }
 
   // =========================================================================
-  // LOGIK FÜR AKTIONEN & BUTTONS (HANDLERS)
+  // LOGIK FÜR AKTIONEN & BUTTONS
   // =========================================================================
-
-  // Setzt die Session für den Zeugmeister aktiv und sichert sie permanent im Browser-Speicher
   function handleBetreuerLogin(name) {
     localStorage.setItem('active_betreuer', name);
     setCurrentBetreuer(name);
   }
 
-  // Erstellt ein neues Kind in der Datenbank. Die Bestätigungs-Haken starten standardmäßig auf 'false'
+  // NEU (PUNKT 2): BLÄTTER-LOGIK (ZUM NÄCHSTEN ODER VORHERIGEN KIND SPRINGEN)
+  function handleNavigateCadett(direction) {
+    if (!selectedCadett || cadetten.length === 0) return;
+    
+    // Findet den Index des aktuell geöffneten Kindes in der alphabetischen Gesamtliste
+    const currentIndex = cadetten.findIndex(c => c.id === selectedCadett.id);
+    let nextIndex = currentIndex + direction;
+
+    // Endlos-Schleife verhindern: Wenn am Ende angekommen, wieder von vorne starten, und umgekehrt
+    if (nextIndex >= cadetten.length) nextIndex = 0;
+    if (nextIndex < 0) nextIndex = cadetten.length - 1;
+
+    setSelectedCadett(cadetten[nextIndex]);
+  }
+
   async function handleAddCadett(e) {
     e.preventDefault(); 
     if (!newVorname || !newNachname) return; 
@@ -148,7 +149,8 @@ export default function App() {
       vorname: newVorname, 
       nachname: newNachname, 
       dsgvo_bestaetigt: false, 
-      empfang_bestaetigt: false 
+      empfang_bestaetigt: false,
+      kommentar: '' 
     }]);
 
     if (!error) {
@@ -159,28 +161,60 @@ export default function App() {
     }
   }
 
-  // Schreibt ein komplett neues, unbenutztes Ausrüstungsteil in den Lagerbestand der Datenbank
+  async function handleUpdateName(e) {
+    e.preventDefault();
+    if (!editVorname.trim() || !editNachname.trim()) return;
+
+    const { error } = await supabase.from('cadetten').update({
+      vorname: editVorname.trim(),
+      nachname: editNachname.trim()
+    }).eq('id', selectedCadett.id);
+
+    if (!error) {
+      logAction("Name korrigiert", `Name von ID ${selectedCadett.id} geändert von "${selectedCadett.vorname} ${selectedCadett.nachname}" zu "${editVorname} ${editNachname}".`);
+      setIsEditingName(false);
+      setSelectedCadett(prev => ({ ...prev, vorname: editVorname.trim(), nachname: editNachname.trim() }));
+      fetchCadetten();
+    } else {
+      alert(`Fehler beim Ändern des Namens: ${error.message}`);
+    }
+  }
+
+  async function handleSaveKommentar() {
+    const { error } = await supabase.from('cadetten').update({
+      kommentar: kommentarText
+    }).eq('id', selectedCadett.id);
+
+    if (!error) {
+      logAction("Kommentar aktualisiert", `Notiz für ${selectedCadett.vorname} ${selectedCadett.nachname} wurde aktualisiert.`);
+      setKommentarGespeichert(true);
+      setSelectedCadett(prev => ({ ...prev, kommentar: kommentarText }));
+      fetchCadetten();
+    } else {
+      alert(`Fehler beim Speichern der Notiz: ${error.message}`);
+    }
+  }
+
   async function handleAddInventar(e) {
     e.preventDefault();
     if (!newArtikelKat) return;
 
     const { error } = await supabase.from('inventar').insert([{
       artikel: newArtikelKat,
-      groesse: newGroesse || null, // Wenn leer gelassen, wird NULL in der DB gespeichert
+      groesse: newGroesse || null, 
       zustand: newZustand,
-      status: 'Frei' // Neue Teile stehen sofort zur Leihe im Kleiderkammer-Pool bereit
+      status: 'Frei' 
     }]);
 
     if (!error) {
       logAction("Teil ins Lager gebucht", `${newArtikelKat} (Größe: ${newGroesse || 'k.A.'}, Zustand: ${newZustand}) hinzugefügt.`);
-      setNewGroesse(''); // Eingabefeld leeren für das nächste Teil
-      fetchInventar();    // UI-Liste sofort erneuern
+      setNewGroesse(''); 
+      fetchInventar();    
     } else {
       alert(`Fehler beim Hinzufügen: ${error.message}`);
     }
   }
 
-  // Schaltet die datenschutzrechtliche Einwilligung im Profil des Kindes um (Checkbox 1)
   async function toggleDSGVO(cadett) {
     if (cadett.dsgvo_bestaetigt) {
       const sicheresEntfernen = window.confirm(`WARNUNG:\nDu entfernst gerade die Datenschutz-Genehmigung für ${cadett.vorname}.\nBist du sicher?`);
@@ -196,7 +230,6 @@ export default function App() {
     }
   }
 
-  // Steuert die digitale Empfangsbestätigung der Eltern (Checkbox 2)
   async function toggleEmpfang(cadett) {
     if (cadett.empfang_bestaetigt) {
       const cancel = window.confirm("Möchtest du die Empfangsbestätigung wirklich zurücksetzen?");
@@ -204,21 +237,17 @@ export default function App() {
     }
 
     const neuerStatus = !cadett.empfang_bestaetigt;
-    
-    // Sendet das Update an die PostgreSQL-Tabelle 'cadetten'
     const { error } = await supabase.from('cadetten').update({ empfang_bestaetigt: neuerStatus }).eq('id', cadett.id);
     
     if (!error) {
       logAction(neuerStatus ? "Empfang quittiert" : "Empfang storniert", `Erziehungsberechtigte von ${cadett.vorname} ${cadett.nachname} haben den Erhalt digital bestätigt.`);
       await fetchCadetten();
-      // Zustand im UI unverzüglich synchronisieren, um Fehlbedienungen zu unterbinden
       setSelectedCadett(prev => ({ ...prev, empfang_bestaetigt: neuerStatus }));
     } else {
       alert(`Fehler beim Aktualisieren der Quittung: ${error.message}`);
     }
   }
 
-  // Löscht ein Kind mitsamt Kaskadierung.
   async function handleDeletetCadett(cadett) {
     const ersteAbfrage = window.confirm(`Kind löschen?\nMöchtest du ${cadett.vorname} ${cadett.nachname} wirklich aus dem System entfernen?`);
     if (!ersteAbfrage) return;
@@ -232,7 +261,7 @@ export default function App() {
       const { error: cadettError } = await supabase.from('cadetten').delete().eq('id', cadett.id);
       if (!cadettError) {
         logAction("Cadett gelöscht", `${cadett.vorname} ${cadett.nachname} wurde vollständig entfernt.`);
-        setSelectedCadett(null); // Detailansicht schließen, da das Kind nicht mehr existiert
+        setSelectedCadett(null); 
         fetchCadetten(); 
         fetchInventar();
         fetchAllAusgaben();
@@ -240,7 +269,6 @@ export default function App() {
     }
   }
 
-  // Verarbeitet die Zuweisung eines Uniformteils im Modal (Egal ob Lagerware, Eigenbesitz oder Nicht benötigt)
   async function handleAusgabeSpeichern(kategorie, typ) {
     if (typ === 'lager' && !selectedTeilId) {
       alert("Bitte wähle zuerst eine Lager-ID aus!");
@@ -263,8 +291,6 @@ export default function App() {
       return;
     }
 
-    // AUTOMATISCHE UNTERSCHRIFT-STORNIERUNG: Da sich der Kleidungs-Sollbestand des Kindes verändert hat, 
-    // wird der digitale Elternhaken in der DB und im aktiven Zustand sofort annulliert!
     await supabase.from('cadetten').update({ empfang_bestaetigt: false }).eq('id', selectedCadett.id);
     setSelectedCadett(prev => ({ ...prev, empfang_bestaetigt: false }));
 
@@ -283,7 +309,6 @@ export default function App() {
     fetchAllAusgaben();
   }
 
-  // Nimmt ein Kleidungsstück zurück
   async function handleRueckgabe(ausgabeId, kategorie, inventarId) {
     const bestaetigung = window.confirm(`Möchtest du das Teil für "${kategorie}" wirklich als zurückgegeben markieren?`);
     if (!bestaetigung) return;
@@ -304,9 +329,9 @@ export default function App() {
   }
 
   // =========================================================================
-  // PDF-GENERATOR (HIER ERFOLGT DIE GESTALTUNG DES AUSGABE-BELEGS)
+  // PDF-GENERATOR & SHARE LOGIK
   // =========================================================================
-  function generatePDF(cadett, aktuelleAusgaben) {
+  async function generateAndSharePDF(cadett, aktuelleAusgaben) {
     const doc = new jsPDF();
     
     doc.setFillColor(196, 18, 48); 
@@ -344,20 +369,41 @@ export default function App() {
     doc.text(doc.splitTextToSize(rechtstext, 170), 20, yPos + 6);
     
     doc.setFontSize(10); 
+    // NEU (PUNKT 5): EMOJIS ENTFERNT (Schloss & Stift gelöscht, da sie in Helvetica fehlerhaft als Kästchen dargestellt wurden)
     doc.text(`Datenschutz (DSGVO): ${cadett.dsgvo_bestaetigt ? 'ERTEILT (Digital hinterlegt)' : 'OFFEN / AUSSTEHEND'}`, 20, yPos + 25);
-    doc.text(`Übergabe-Quittung Eltern: ${cadett.empfang_bestaetigt ? 'BESTÄTIGT (Vor Ort digital autorisiert)' : 'OFFEN / AUSSTEHEND'}`, 20, yPos + 32);
+    doc.text(`Uebergabe-Quittung Eltern: ${cadett.empfang_bestaetigt ? 'BESTAETIGT (Vor Ort digital autorisiert)' : 'OFFEN / AUSSTEHEND'}`, 20, yPos + 32);
     
     logAction("PDF generiert", `Beleg-PDF für ${cadett.vorname} ${cadett.nachname} aufgerufen.`);
-    doc.output('dataurlnewwindow');
+
+    // NEU (PUNKT 4): DYNAMISCHER FILENAME NACH SCHEMA <Vorname_Nachname>.pdf
+    const dateiname = `${cadett.vorname}_${cadett.nachname}.pdf`;
+
+    // NEU (PUNKT 3): INTERACTIVE WHATSAPP / HANDY TEILEN ÜBER WEB SHARE API
+    // Statt das PDF starr im Browser zu öffnen, übergeben wir es an das native Teilen-Menü des Mobiltelefons
+    if (navigator.canShare && navigator.share) {
+      try {
+        const pdfBlob = doc.output('blob'); // Konvertiert PDF in Rohdaten
+        const file = new File([pdfBlob], dateiname, { type: 'application/pdf' }); // Erzeugt virtuelle Datei
+
+        await navigator.share({
+          files: [file],
+          title: `Uniformen-Beleg: ${cadett.vorname} ${cadett.nachname}`,
+          text: `Hier ist der aktuelle Ausstattungsbeleg von ${cadett.vorname}.`
+        });
+      } catch (err) {
+        // Falls der Nutzer den Teilen-Dialog abbricht, passiert nichts Schlimmes
+        console.log("Teilen abgebrochen oder fehlgeschlagen:", err);
+      }
+    } else {
+      // Fallback: Wenn die App auf einem alten PC läuft, der kein "Teilen-Menü" kennt, wird es einfach direkt heruntergeladen
+      doc.save(dateiname);
+    }
   }
 
   function getAusstattungsStatus(cadettId) {
     return `${allAusgaben.filter(a => a.cadetten_id === cadettId).length} / ${SOLL_KATEGORIEN.length}`;
   }
 
-  // =========================================================================
-  // VIEW-RENDERING 1: LOGIN SCREEN (WENN KEIN BETREUER AKTIV IST)
-  // =========================================================================
   if (!currentBetreuer) {
     return (
       <div style={{ fontFamily: 'sans-serif', padding: '40px 20px', maxWidth: '400px', margin: '100px auto', backgroundColor: COLORS.pureWhite, borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', borderTop: `6px solid ${COLORS.primaryRed}` }}>
@@ -370,36 +416,22 @@ export default function App() {
     );
   }
 
-  const freieTeileFuerKategorie = inventar.filter(i => i.artikel === activeKategorie && (i.status === 'Frei' || i.status === 'Free'));
+  const freieTeileFuerKategorie = inventar
+    .filter(i => i.artikel === activeKategorie && (i.status === 'Frei' || i.status === 'Free'))
+    .sort((a, b) => String(a.id).localeCompare(String(b.id), undefined, { numeric: true, sensitivity: 'base' })); 
+
   const istVollstaendigBestaetigt = selectedCadett?.dsgvo_bestaetigt && selectedCadett?.empfang_bestaetigt;
 
-  // =========================================================================
-  // NEU: DYNAMISCHE FILTER-ERMITTLUNG AUS DER DATENBANK
-  // =========================================================================
-  
-  // 1. Alle real existierenden Größen aus dem geladenen Inventar extrahieren
   const existierendeGroessen = [
     'Alle',
-    ...new Set(
-      inventar
-        .map(item => item.groesse ? item.groesse.trim() : '') // Leerzeichen entfernen
-        .filter(g => g !== '')                                // Zeilen ohne Größenangabe ignorieren
-    )
-  ].sort(); // Alphabetisch/numerisch sortieren für eine saubere Optik im UI
+    ...new Set(inventar.map(item => item.groesse ? item.groesse.trim() : '').filter(g => g !== ''))
+  ].sort(); 
 
-  // 2. Alle real existierenden Zustände aus dem geladenen Inventar extrahieren
   const existierendeZustaende = [
     'Alle',
-    ...new Set(
-      inventar
-        .map(item => item.zustand ? item.zustand.trim() : '')
-        .filter(z => z !== '')
-    )
+    ...new Set(inventar.map(item => item.zustand ? item.zustand.trim() : '').filter(z => z !== ''))
   ].sort();
 
-  // =========================================================================
-  // VIEW-RENDERING 2: HAUPT-APP (MOBILE FIRST CONTAINER - MAX 480PX WIDTH)
-  // =========================================================================
   return (
     <div style={{ fontFamily: 'sans-serif', padding: '15px', maxWidth: '480px', margin: '0 auto', backgroundColor: COLORS.appBackground, minHeight: '100vh', color: COLORS.textDark }}>
       
@@ -409,7 +441,7 @@ export default function App() {
         <button onClick={() => setCurrentBetreuer('')} style={{ background: 'none', border: 'none', color: COLORS.primaryRed, cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>Wechseln</button>
       </div>
 
-      {/* Haupt-Navigationsleiste (Tab-Switcher) */}
+      {/* Haupt-Navigationsleiste */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', background: COLORS.primaryRed, padding: '6px', borderRadius: '10px' }}>
         <button onClick={() => { setView('cadetten'); setSelectedCadett(null); }} style={{ flex: 1, padding: '10px', background: view === 'cadetten' ? COLORS.pureWhite : 'transparent', color: view === 'cadetten' ? COLORS.primaryRed : COLORS.pureWhite, border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>Cadetten</button>
         <button onClick={() => setView('inventar')} style={{ flex: 1, padding: '10px', background: view === 'inventar' ? COLORS.pureWhite : 'transparent', color: view === 'inventar' ? COLORS.primaryRed : COLORS.pureWhite, border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>Lagerbestand</button>
@@ -444,71 +476,138 @@ export default function App() {
 
       {/* TAB A-DET: CADETTEN - DETAILANSICHT */}
       {view === 'cadetten' && selectedCadett && (
-        <div style={{ background: COLORS.pureWhite, padding: '20px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <button onClick={() => setSelectedCadett(null)} style={{ background: 'none', border: 'none', color: COLORS.primaryRed, cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>← Übersicht</button>
-            <button onClick={() => handleDeletetCadett(selectedCadett)} style={{ background: 'none', border: 'none', color: COLORS.textMuted, cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>🗑️ Kind löschen</button>
-          </div>
+        <div style={{ background: COLORS.pureWhite, borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
           
-          <h2 style={{ margin: '15px 0 4px 0', color: COLORS.primaryRed }}>{selectedCadett.vorname} {selectedCadett.nachname}</h2>
-
-          <div style={{ background: '#F7FAFC', padding: '12px', borderRadius: '8px', margin: '15px 0', border: `1px solid ${COLORS.borderLight}` }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '10px', marginBottom: '10px', borderBottom: `1px solid ${COLORS.borderLight}` }}>
-              <div>
-                <span style={{ fontSize: '13px', fontWeight: 'bold' }}>1. Datenschutz (DSGVO)</span>
-                <div style={{ fontSize: '11px', color: COLORS.textMuted }}>Speicherung für Kleiderkammer erlaubt</div>
+          {/* NEU (PUNKT 6): FIXED / STICKY HEADER - BLEIBT OBEN AM DISPLAYRAND FIXIERT BEIM SCROLLEN */}
+          <div style={{ position: 'sticky', top: 0, backgroundColor: COLORS.pureWhite, borderBottom: `1px solid ${COLORS.borderLight}`, padding: '15px 20px', zIndex: 100, boxShadow: '0 2px 5px rgba(0,0,0,0.04)' }}>
+            
+            {/* Header-Aktionszeile */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <button onClick={() => setSelectedCadett(null)} style={{ background: 'none', border: 'none', color: COLORS.primaryRed, cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>← Übersicht</button>
+              
+              {/* NEU (PUNKT 2): BLÄTTER-NAVIGATIONSBUTTONS (ZUM NÄCHSTEN/VORHERIGEN KIND) */}
+              <div style={{ display: 'flex', gap: '5px', background: COLORS.appBackground, padding: '2px', borderRadius: '6px' }}>
+                <button onClick={() => handleNavigateCadett(-1)} style={{ background: COLORS.pureWhite, border: `1px solid ${COLORS.borderLight}`, borderRadius: '4px', padding: '4px 10px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }} title="Vorheriges Kind">◀</button>
+                <button onClick={() => handleNavigateCadett(1)} style={{ background: COLORS.pureWhite, border: `1px solid ${COLORS.borderLight}`, borderRadius: '4px', padding: '4px 10px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }} title="Nächstes Kind">▶</button>
               </div>
-              <input type="checkbox" checked={selectedCadett.dsgvo_bestaetigt || false} onChange={() => toggleDSGVO(selectedCadett)} style={{ width: '22px', height: '22px', cursor: 'pointer', accentColor: COLORS.statusGreen }} />
+
+              <button onClick={() => handleDeletetCadett(selectedCadett)} style={{ background: 'none', border: 'none', color: COLORS.textMuted, cursor: 'pointer', fontSize: '12px' }}>🗑️ Löschen</button>
+            </div>
+            
+            {/* Namen-Anzeige / Bearbeitung direkt im fixierten Header */}
+            {!isEditingName ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h2 style={{ margin: 0, fontSize: '20px', color: COLORS.primaryRed, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedCadett.vorname} {selectedCadett.nachname}</h2>
+                <button 
+                  onClick={() => { 
+                    setEditVorname(selectedCadett.vorname); 
+                    setEditNachname(selectedCadett.nachname); 
+                    setIsEditingName(true); 
+                  }} 
+                  style={{ background: 'none', border: 'none', color: COLORS.textMuted, cursor: 'pointer', fontSize: '14px' }}
+                >
+                  ✏️
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleUpdateName} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '5px', background: COLORS.appBackground, borderRadius: '6px' }}>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <input type="text" value={editVorname} onChange={e => setEditVorname(e.target.value)} style={{ flex: 1, padding: '5px', fontSize: '12px', borderRadius: '4px', border: `1px solid ${COLORS.borderLight}` }} placeholder="Vorname" />
+                  <input type="text" value={editNachname} onChange={e => setEditNachname(e.target.value)} style={{ flex: 1, padding: '5px', fontSize: '12px', borderRadius: '4px', border: `1px solid ${COLORS.borderLight}` }} placeholder="Nachname" />
+                </div>
+                <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={() => setIsEditingName(false)} style={{ padding: '2px 8px', fontSize: '11px', background: 'none', border: `1px solid ${COLORS.borderLight}`, borderRadius: '4px', cursor: 'pointer' }}>Abbrechen</button>
+                  <button type="submit" style={{ padding: '2px 8px', fontSize: '11px', background: COLORS.statusGreen, color: COLORS.pureWhite, border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>Speichern</button>
+                </div>
+              </form>
+            )}
+          </div>
+
+          {/* Innerer Scroll-Inhalt der Detailansicht */}
+          <div style={{ padding: '20px' }}>
+            
+            {/* Status-Haken Checkboxen */}
+            <div style={{ background: '#F7FAFC', padding: '12px', borderRadius: '8px', marginBottom: '15px', border: `1px solid ${COLORS.borderLight}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '10px', marginBottom: '10px', borderBottom: `1px solid ${COLORS.borderLight}` }}>
+                <div>
+                  <span style={{ fontSize: '13px', fontWeight: 'bold' }}>1. Datenschutz (DSGVO)</span>
+                  <div style={{ fontSize: '11px', color: COLORS.textMuted }}>Speicherung für Kleiderkammer erlaubt</div>
+                </div>
+                <input type="checkbox" checked={selectedCadett.dsgvo_bestaetigt || false} onChange={() => toggleDSGVO(selectedCadett)} style={{ width: '22px', height: '22px', cursor: 'pointer', accentColor: COLORS.statusGreen }} />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <span style={{ fontSize: '13px', fontWeight: 'bold' }}>2. Übergabe-Quittung</span>
+                  <div style={{ fontSize: '11px', color: COLORS.textMuted }}>Eltern haben den Erhalt digital bestätigt</div>
+                </div>
+                <input type="checkbox" checked={selectedCadett.empfang_bestaetigt || false} onChange={() => toggleEmpfang(selectedCadett)} style={{ width: '22px', height: '22px', cursor: 'pointer', accentColor: COLORS.statusGreen }} />
+              </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <span style={{ fontSize: '13px', fontWeight: 'bold' }}>2. Übergabe-Quittung</span>
-                <div style={{ fontSize: '11px', color: COLORS.textMuted }}>Eltern haben den Erhalt digital bestätigt</div>
-              </div>
-              <input type="checkbox" checked={selectedCadett.empfang_bestaetigt || false} onChange={() => toggleEmpfang(selectedCadett)} style={{ width: '22px', height: '22px', cursor: 'pointer', accentColor: COLORS.statusGreen }} />
+            {/* Freitext-Kommentarfeld */}
+            <div style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <label style={{ fontSize: '11px', fontWeight: 'bold', color: COLORS.textMuted, textTransform: 'uppercase' }}>✍️ Interne Notizen / Kommentare:</label>
+              <textarea 
+                value={kommentarText} 
+                onChange={e => {
+                  setKommentarText(e.target.value);
+                  setKommentarGespeichert(false); 
+                }} 
+                placeholder="Besonderheiten eintragen... (z.B. Jacke gekürzt, etc.)"
+                style={{ width: '100%', minHeight: '60px', padding: '8px', boxSizing: 'border-box', borderRadius: '6px', border: `1px solid ${kommentarGespeichert ? COLORS.borderLight : COLORS.warningOrange}`, fontSize: '13px', fontFamily: 'sans-serif', resize: 'vertical' }}
+              />
+              {!kommentarGespeichert && (
+                <button 
+                  onClick={handleSaveKommentar} 
+                  style={{ alignSelf: 'flex-end', background: COLORS.warningOrange, color: COLORS.pureWhite, border: 'none', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
+                >
+                  Notiz speichern
+                </button>
+              )}
             </div>
+
+            {/* Kleiderliste */}
+            <h3 style={{ fontSize: '13px', marginBottom: '10px', textTransform: 'uppercase', color: COLORS.textMuted }}>Soll-Ausstattung</h3>
+            {SOLL_KATEGORIEN.map(kat => {
+              const geliehen = ausgaben.find(a => a.kategorie_soll === kat);
+              const istNichtBenoetigt = geliehen && geliehen.status_nicht_benoetigt;
+              const istSelbstBeschafft = geliehen && geliehen.selbst_beschafft; 
+
+              return (
+                <div key={kat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 0', borderBottom: `1px solid ${COLORS.borderLight}` }}>
+                  <div>
+                    <span style={{ marginRight: '10px' }}>{geliehen ? '🔴' : '⚪'}</span>
+                    <strong style={{ fontSize: '14px' }}>{kat}</strong>
+                    
+                    {geliehen && !istSelbstBeschafft && !istNichtBenoetigt && <span style={{ marginLeft: '6px', color: COLORS.textMuted, fontSize: '11px' }}>[ID: {geliehen.inventar_id}]</span>}
+                    {istNichtBenoetigt && <span style={{ marginLeft: '6px', color: COLORS.textMuted, fontSize: '11px', fontStyle: 'italic' }}>(Nicht benötigt)</span>}
+                    {istSelbstBeschafft && <span style={{ marginLeft: '6px', color: COLORS.textMuted, fontSize: '11px', fontStyle: 'italic' }}>(Selbst beschafft)</span>}
+                  </div>
+                  <div>
+                    {geliehen ? (
+                      <button onClick={() => handleRueckgabe(geliehen.id, kat, geliehen.inventar_id)} style={{ background: '#FFF5F5', color: COLORS.primaryRed, border: `1px solid ${COLORS.primaryRed}`, padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>
+                        {istNichtBenoetigt || istSelbstBeschafft ? 'Ändern' : 'Rückgabe'}
+                      </button>
+                    ) : (
+                      <button onClick={() => { setActiveKategorie(kat); setShowAusgabeModal(true); }} style={{ background: COLORS.primaryRed, color: COLORS.pureWhite, border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Ausgeben</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            
+            {/* Beleg teilen via WhatsApp oder Download */}
+            <button onClick={() => generateAndSharePDF(selectedCadett, ausgaben)} style={{ width: '100%', marginTop: '25px', background: istVollstaendigBestaetigt ? COLORS.textDark : COLORS.warningOrange, color: COLORS.pureWhite, border: 'none', padding: '12px', borderRadius: '6px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
+              <span>{istVollstaendigBestaetigt ? '🟢 Beleg via WhatsApp senden' : '⚠️ Beleg senden (Haken fehlen!)'}</span>
+            </button>
           </div>
-
-          <h3 style={{ fontSize: '14px', marginBottom: '10px', textTransform: 'uppercase', color: COLORS.textMuted }}>Soll-Ausstattung</h3>
-          {SOLL_KATEGORIEN.map(kat => {
-            const geliehen = ausgaben.find(a => a.kategorie_soll === kat);
-            const istNichtBenoetigt = geliehen && geliehen.status_nicht_benoetigt;
-            const istSelbstBeschafft = geliehen && geliehen.selbst_beschafft; 
-
-            return (
-              <div key={kat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '11px 0', borderBottom: `1px solid ${COLORS.borderLight}` }}>
-                <div>
-                  <span style={{ marginRight: '10px' }}>{geliehen ? '🔴' : '⚪'}</span>
-                  <strong style={{ fontSize: '14px' }}>{kat}</strong>
-                  
-                  {geliehen && !istSelbstBeschafft && !istNichtBenoetigt && <span style={{ marginLeft: '6px', color: COLORS.textMuted, fontSize: '11px' }}>[ID: {geliehen.inventar_id}]</span>}
-                  {istNichtBenoetigt && <span style={{ marginLeft: '6px', color: COLORS.textMuted, fontSize: '11px', fontStyle: 'italic' }}>(Nicht benötigt)</span>}
-                  {istSelbstBeschafft && <span style={{ marginLeft: '6px', color: COLORS.textMuted, fontSize: '11px', fontStyle: 'italic' }}>(Selbst beschafft)</span>}
-                </div>
-                <div>
-                  {geliehen ? (
-                    <button onClick={() => handleRueckgabe(geliehen.id, kat, geliehen.inventar_id)} style={{ background: '#FFF5F5', color: COLORS.primaryRed, border: `1px solid ${COLORS.primaryRed}`, padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>
-                      {istNichtBenoetigt || istSelbstBeschafft ? 'Ändern' : 'Rückgabe'}
-                    </button>
-                  ) : (
-                    <button onClick={() => { setActiveKategorie(kat); setShowAusgabeModal(true); }} style={{ background: COLORS.primaryRed, color: COLORS.pureWhite, border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Ausgeben</button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-          
-          <button onClick={() => generatePDF(selectedCadett, ausgaben)} style={{ width: '100%', marginTop: '25px', background: istVollstaendigBestaetigt ? COLORS.textDark : COLORS.warningOrange, color: COLORS.pureWhite, border: 'none', padding: '12px', borderRadius: '6px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer' }}>
-            {istVollstaendigBestaetigt ? '📄 PDF Beleg erzeugen (Alles OK)' : '⚠️ PDF erzeugen (Haken fehlen noch!)'}
-          </button>
         </div>
       )}
 
-      {/* TAB B: LAGERBESTAND (MIT DYNAMISCHEN FILTER-BUTTONS) */}
+      {/* TAB B: LAGERBESTAND */}
       {view === 'inventar' && (
         <div>
-          {/* Schnellerfassung */}
           <h3 style={{ fontSize: '16px', color: COLORS.primaryRed, borderBottom: `2px solid ${COLORS.primaryRed}`, paddingBottom: '5px' }}>Neues Uniformteil erfassen</h3>
           <form onSubmit={handleAddInventar} style={{ background: COLORS.pureWhite, padding: '12px', borderRadius: '8px', marginBottom: '20px', marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', gap: '6px' }}>
@@ -529,10 +628,8 @@ export default function App() {
 
           <h3 style={{ fontSize: '16px', marginBottom: '12px' }}>Lagerbestand ({inventar.length} Teile)</h3>
           
-          {/* FILTERBOX (NUR DYNAMISCHE STRINGS DIREKT AUS DER DATENBANK) */}
           <div style={{ background: COLORS.pureWhite, padding: '12px', borderRadius: '8px', marginBottom: '15px', display: 'flex', flexDirection: 'column', gap: '10px', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
             
-            {/* Kategorie */}
             <div>
               <label style={{ fontSize: '11px', fontWeight: 'bold', color: COLORS.textMuted, display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Kategorie</label>
               <select value={lagerFilter} onChange={e => setLagerFilter(e.target.value)} style={{ width: '100%', padding: '8px', borderRadius: '6px', border: `1px solid ${COLORS.borderLight}`, fontSize: '13px', fontWeight: 'bold' }}>
@@ -541,7 +638,6 @@ export default function App() {
               </select>
             </div>
 
-            {/* Größe: ANPASSUNG -> Rendert jetzt dynamisch nur existierende Einträge aus 'existierendeGroessen' */}
             <div>
               <label style={{ fontSize: '11px', fontWeight: 'bold', color: COLORS.textMuted, display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Größe</label>
               <div style={{ display: 'flex', gap: '5px', overflowX: 'auto', paddingBottom: '3px' }}>
@@ -556,7 +652,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Zustand: ANPASSUNG -> Rendert jetzt dynamisch nur existierende Einträge aus 'existierendeZustaende' */}
             <div>
               <label style={{ fontSize: '11px', fontWeight: 'bold', color: COLORS.textMuted, display: 'block', marginBottom: '4px', textTransform: 'uppercase' }}>Zustand</label>
               <div style={{ display: 'flex', gap: '5px', overflowX: 'auto', paddingBottom: '3px' }}>
@@ -573,7 +668,6 @@ export default function App() {
 
           </div>
 
-          {/* Anzeige Ergebnisse */}
           <div style={{ maxHeight: '45vh', overflowY: 'auto', background: COLORS.pureWhite, padding: '8px', borderRadius: '8px' }}>
             {inventar
               .filter(item => {
@@ -600,7 +694,6 @@ export default function App() {
                 </div>
               ))}
 
-            {/* Fallback */}
             {inventar.filter(item => {
               const passtKategorie = lagerFilter === 'Alle' || item.artikel === lagerFilter;
               const passtGroesse = groessenFilter === 'Alle' || (item.groesse && item.groesse.toUpperCase() === groessenFilter.toUpperCase());
