@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './services/supabaseClient';
-import { SOLL_KATEGORIEN, COLORS } from './constants/config';
+import { COLORS } from './constants/config';
+import { getSollKategorienFuerCadett } from './constants/config'; // Pfad anpassen, falls in utils/helper.js
 import { generateAndSharePDF } from './services/pdfService';
 
 // Komponenten importieren
+import CadettenListe from './components/CadettenListe';
 import CadettDetail from './components/CadettDetail';
 import AusgabeModal from './components/AusgabeModal';
 import InventarTab from './components/InventarTab';
@@ -11,8 +13,8 @@ import ProtokollTab from './components/ProtokollTab';
 
 export default function App() {
   const [view, setView] = useState('cadetten'); 
-  const [currentBetreuer, setCurrentBetreuer] = useState(''); // Startet jetzt leer
-  const [isLoading, setIsLoading] = useState(true); // Verhindert Flackern beim Laden
+  const [currentBetreuer, setCurrentBetreuer] = useState(''); 
+  const [isLoading, setIsLoading] = useState(true); 
 
   // States für das Login-Formular
   const [email, setEmail] = useState('');
@@ -35,7 +37,7 @@ export default function App() {
   const [lagerFilter, setLagerFilter] = useState('Alle');       
   const [groessenFilter, setGroessenFilter] = useState('Alle');  
   const [zustandFilter, setZustandFilter] = useState('Alle');    
-  const [newArtikelKat, setNewArtikelKat] = useState(SOLL_KATEGORIEN[0]); 
+  const [newArtikelKat, setNewArtikelKat] = useState('Uniformjacke'); // Standardwert angepasst
   const [newZustand, setNewZustand] = useState('Neu');                  
   const [isEditingName, setIsEditingName] = useState(false);       
   const [editVorname, setEditVorname] = useState('');               
@@ -43,7 +45,7 @@ export default function App() {
   const [kommentarText, setKommentarText] = useState('');           
   const [kommentarGespeichert, setKommentarGespeichert] = useState(true); 
 
-  // Hilfsfunktion: Wandelt Login-E-Mails in lesbare Namen für das Audit-Log um
+  // Hilfsfunktion für Login-Namen im Audit-Log
   function getBetreuerName(userEmail) {
     if (!userEmail) return 'Unbekannt';
     const emailLower = userEmail.toLowerCase();
@@ -52,10 +54,10 @@ export default function App() {
     if (emailLower.includes('ro.fr')) return 'Ronny';
     if (emailLower.includes('simone')) return 'Simone';
     if (emailLower.includes('tina')) return 'Tina';
-    return userEmail.split('@')[0]; // Fallback, falls eine neue E-Mail hinzugefügt wird
+    return userEmail.split('@')[0];
   }
 
-  // AUTOMATISCHER SESSION-CHECK BEIM START
+  // Automatischer Session-Check beim Start
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
@@ -65,7 +67,7 @@ export default function App() {
     });
   }, []);
 
-  // API-Abfragen (Nur wenn ein Betreuer eingeloggt ist)
+  // API-Abfragen
   useEffect(() => { 
     if (currentBetreuer) { 
       fetchCadetten(); 
@@ -85,16 +87,11 @@ export default function App() {
     } 
   }, [selectedCadett]);
 
-  // SICHERER LOGIN-HANDLER
+  // Login-Handler
   async function handleSichererLogin(e) {
     e.preventDefault();
     setLoginError('');
-    
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password,
-    });
-
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setLoginError('Falsche E-Mail-Adresse oder Passwort.');
     } else if (data?.user) {
@@ -102,14 +99,14 @@ export default function App() {
     }
   }
 
-  // LOGOUT-HANDLER
+  // Logout-Handler
   async function handleLogout() {
     await supabase.auth.signOut();
     setCurrentBetreuer('');
     setSelectedCadett(null);
   }
 
-  // Schaltet im Detail-Modus einen Cadetten vor oder zurück (◀ ▶)
+  // Navigation im Detail-Modus
   function handleNavigateCadett(dir) { 
     if (!selectedCadett || cadetten.length === 0) return; 
     const idx = cadetten.findIndex(c => c.id === selectedCadett.id); 
@@ -119,7 +116,7 @@ export default function App() {
     setSelectedCadett(cadetten[nIdx]); 
   }
 
-  // Datenbank-Aktionen (unverändert, nutzt jetzt das fälschungssichere currentBetreuer)
+  // Datenbank-Aktionen
   async function logAction(aktion, details) { await supabase.from('audit_log').insert([{ betreuer: currentBetreuer, aktion, details }]); fetchLogs(); }
   async function fetchCadetten() { const { data } = await supabase.from('cadetten').select('*').order('vorname', { ascending: true }); if (data) setCadetten(data); }
   async function fetchInventar() { const { data } = await supabase.from('inventar').select('*'); if (data) setInventar(data); }
@@ -127,7 +124,7 @@ export default function App() {
   async function fetchAusgaben(id) { const { data } = await supabase.from('ausgaben').select('*').eq('cadetten_id', id); if (data) setAusgaben(data); }
   async function fetchLogs() { const { data } = await supabase.from('audit_log').select('*').order('created_at', { ascending: false }).limit(50); if (data) setLogs(data); }
 
-  async function handleAddCadett(e) { e.preventDefault(); if (!newVorname || !newNachname) return; const { error } = await supabase.from('cadetten').insert([{ vorname: newVorname, nachname: newNachname, dsgvo_bestaetigt: false, empfang_bestaetigt: false, kommentar: '' }]); if (!error) { logAction("Cadett angelegt", `Hat ${newVorname} ${newNachname} hinzugefügt.`); setNewVorname(''); setNewNachname(''); fetchCadetten(); } }
+  async function handleAddCadett(e) { e.preventDefault(); if (!newVorname || !newNachname) return; const { error } = await supabase.from('cadetten').insert([{ vorname: newVorname.trim(), nachname: newNachname.trim(), dsgvo_bestaetigt: false, empfang_bestaetigt: false, kommentar: '', geschlecht: 'w', gruppen: '' }]); if (!error) { logAction("Cadett angelegt", `Hat ${newVorname} ${newNachname} hinzugefügt.`); setNewVorname(''); setNewNachname(''); fetchCadetten(); } }
   async function handleUpdateName(e) { e.preventDefault(); if (!editVorname.trim() || !editNachname.trim()) return; const { error } = await supabase.from('cadetten').update({ vorname: editVorname.trim(), nachname: editNachname.trim() }).eq('id', selectedCadett.id); if (!error) { logAction("Name korrigiert", `Name geändert zu "${editVorname} ${editNachname}".`); setIsEditingName(false); setSelectedCadett(prev => ({ ...prev, vorname: editVorname.trim(), nachname: editNachname.trim() })); fetchCadetten(); } }
   async function handleSaveKommentar() { const { error } = await supabase.from('cadetten').update({ kommentar: kommentarText }).eq('id', selectedCadett.id); if (!error) { logAction("Kommentar aktualisiert", `Notiz aktualisiert.`); setKommentarGespeichert(true); setSelectedCadett(prev => ({ ...prev, kommentar: kommentarText })); fetchCadetten(); } }
   async function handleAddInventar(e) { e.preventDefault(); if (!newArtikelKat) return; const { error } = await supabase.from('inventar').insert([{ artikel: newArtikelKat, groesse: newGroesse || null, zustand: newZustand, status: 'Frei' }]); if (!error) { logAction("Teil ins Lager gebucht", `${newArtikelKat} hinzugefügt.`); setNewGroesse(''); fetchInventar(); } }
@@ -137,11 +134,26 @@ export default function App() {
   async function handleAusgabeSpeichern(kat, typ) { if (typ === 'lager' && !selectedTeilId) return; const { error } = await supabase.from('ausgaben').insert([{ cadetten_id: selectedCadett.id, kategorie_soll: kat, selbst_beschafft: typ === 'selbst', inventar_id: typ === 'lager' ? selectedTeilId : null, status_nicht_benoetigt: typ === 'nicht_benoetigt' }]); if (!error) { await supabase.from('cadetten').update({ empfang_bestaetigt: false }).eq('id', selectedCadett.id); setSelectedCadett(prev => ({ ...prev, empfang_bestaetigt: false })); logAction("Teil ausgegeben", `${kat} zugewiesen.`); setShowAusgabeModal(false); setSelectedTeilId(''); fetchAusgaben(selectedCadett.id); fetchInventar(); fetchCadetten(); fetchAllAusgaben(); } }
   async function handleRueckgabe(aId, kat) { if (!window.confirm(`Teil zurückgeben?`)) return; const { error } = await supabase.from('ausgaben').delete().eq('id', aId); if (!error) { await supabase.from('cadetten').update({ empfang_bestaetigt: false }).eq('id', selectedCadett.id); setSelectedCadett(prev => ({ ...prev, empfang_bestaetigt: false })); logAction("Teil zurückgegeben", `${kat} zurück.`); fetchAusgaben(selectedCadett.id); fetchInventar(); fetchCadetten(); fetchAllAusgaben(); } }
 
+  // NEU: Universal-Feld-Update für Stammdaten-Speicherung (Geschlecht & Gruppen)
+  async function onUpdateCadettField(cadettId, fieldName, value) {
+    const { error } = await supabase
+      .from('cadetten')
+      .update({ [fieldName]: value })
+      .eq('id', cadettId);
+
+    if (!error) {
+      await logAction("Stammdaten geändert", `Feld "${fieldName}" für Cadett-ID ${cadettId} auf "${value}" aktualisiert.`);
+      setSelectedCadett(prev => ({ ...prev, [fieldName]: value }));
+      fetchCadetten();
+    } else {
+      console.error("Fehler beim Aktualisieren der Stammdaten:", error);
+    }
+  }
+
   if (isLoading) {
     return <div style={{ fontFamily: 'sans-serif', textAlign: 'center', marginTop: '100px', color: COLORS.textMuted }}>Sitzung wird geladen...</div>;
   }
 
-  // NEUE LOGIN-ANSICHT MIT FORMULAR
   if (!currentBetreuer) {
     return (
       <div style={{ fontFamily: 'sans-serif', padding: '40px 20px', maxWidth: '400px', margin: '100px auto', backgroundColor: COLORS.pureWhite, borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.08)', textAlign: 'center', borderTop: `6px solid ${COLORS.primaryRed}` }}>
@@ -149,28 +161,10 @@ export default function App() {
         <p style={{ fontSize: '12.5px', color: COLORS.textMuted, marginBottom: '25px' }}>Ehrengarde der Stadt Bonn e.V.</p>
         
         <form onSubmit={handleSichererLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <input 
-            type="email" 
-            placeholder="E-Mail-Adresse" 
-            value={email} 
-            onChange={e => setEmail(e.target.value)} 
-            style={{ padding: '12px', borderRadius: '8px', border: `1px solid ${COLORS.borderLight}`, fontSize: '15px', boxSizing: 'border-box', width: '100%' }} 
-            required 
-          />
-          <input 
-            type="password" 
-            placeholder="Passwort" 
-            value={password} 
-            onChange={e => setPassword(e.target.value)} 
-            style={{ padding: '12px', borderRadius: '8px', border: `1px solid ${COLORS.borderLight}`, fontSize: '15px', boxSizing: 'border-box', width: '100%' }} 
-            required 
-          />
-          
+          <input type="email" placeholder="E-Mail-Adresse" value={email} onChange={e => setEmail(e.target.value)} style={{ padding: '12px', borderRadius: '8px', border: `1px solid ${COLORS.borderLight}`, fontSize: '15px', boxSizing: 'border-box', width: '100%' }} required />
+          <input type="password" placeholder="Passwort" value={password} onChange={e => setPassword(e.target.value)} style={{ padding: '12px', borderRadius: '8px', border: `1px solid ${COLORS.borderLight}`, fontSize: '15px', boxSizing: 'border-box', width: '100%' }} required />
           {loginError && <p style={{ color: COLORS.primaryRed, fontSize: '13px', margin: '5px 0', fontWeight: 'bold' }}>{loginError}</p>}
-          
-          <button type="submit" style={{ width: '100%', padding: '13px', background: COLORS.primaryRed, color: COLORS.pureWhite, border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>
-            Sicher einloggen
-          </button>
+          <button type="submit" style={{ width: '100%', padding: '13px', background: COLORS.primaryRed, color: COLORS.pureWhite, border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>Sicher einloggen</button>
         </form>
       </div>
     );
@@ -180,7 +174,6 @@ export default function App() {
     <div style={{ fontFamily: 'sans-serif', padding: '15px', maxWidth: '480px', margin: '0 auto', backgroundColor: COLORS.appBackground, minHeight: '100vh', color: COLORS.textDark }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: COLORS.textMuted, marginBottom: '12px' }}>
         <span>👤 Zeugmeister: <strong>{currentBetreuer}</strong></span>
-        {/* Ändern triggert nun ein sicheres Abmelden */}
         <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: COLORS.primaryRed, fontWeight: 'bold', cursor: 'pointer' }}>Abmelden</button>
       </div>
 
@@ -190,32 +183,52 @@ export default function App() {
         <button onClick={() => setView('logs')} style={{ flex: 1, padding: '10px', background: view === 'logs' ? COLORS.pureWhite : 'transparent', color: view === 'logs' ? COLORS.primaryRed : COLORS.pureWhite, border: 'none', borderRadius: '6px', fontWeight: 'bold' }}>📋 Protokoll</button>
       </div>
 
-      {view === 'cadetten' && !selectedCadett && (
-        <div>
-          <h3 style={{ fontSize: '16px', color: COLORS.primaryRed, borderBottom: `2px solid ${COLORS.primaryRed}`, paddingBottom: '5px' }}>Neuen Cadetten eintragen</h3>
-          <form onSubmit={handleAddCadett} style={{ display: 'flex', gap: '8px', marginBottom: '25px', marginTop: '10px' }}>
-            <input type="text" placeholder="Vorname" value={newVorname} onChange={e => setNewVorname(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '6px', border: `1px solid ${COLORS.borderLight}` }} />
-            <input type="text" placeholder="Nachname" value={newNachname} onChange={e => setNewNachname(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '6px', border: `1px solid ${COLORS.borderLight}` }} />
-            <button type="submit" style={{ background: COLORS.primaryRed, color: COLORS.pureWhite, border: 'none', padding: '10px 16px', borderRadius: '6px', fontWeight: 'bold' }}>+</button>
-          </form>
-          {cadetten.map(c => (
-            <div key={c.id} onClick={() => setSelectedCadett(c)} style={{ background: COLORS.pureWhite, padding: '14px', borderRadius: '8px', marginBottom: '10px', cursor: 'pointer', borderLeft: `4px solid ${COLORS.primaryRed}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div><strong>{c.vorname} {c.nachname}</strong><div style={{ fontSize: '12px', color: COLORS.textMuted }}>Ausrüstung: <span style={{ fontWeight: 'bold', color: COLORS.primaryRed }}>{`${allAusgaben.filter(a => a.cadetten_id === c.id).length} / ${SOLL_KATEGORIEN.length}`}</span></div></div>
-              <div style={{ display: 'flex', gap: '4px' }}><span style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '10px', background: c.dsgvo_bestaetigt ? COLORS.statusGreenBg : '#FFF5F5', color: c.dsgvo_bestaetigt ? COLORS.statusGreen : COLORS.primaryRed }}>DSGVO</span><span style={{ fontSize: '10px', padding: '3px 8px', borderRadius: '10px', background: c.empfang_bestaetigt ? COLORS.statusGreenBg : '#FFF5F5', color: c.empfang_bestaetigt ? COLORS.statusGreen : COLORS.primaryRed }}>Quittung</span></div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {view === 'cadetten' && selectedCadett && (
-        <CadettDetail 
-          selectedCadett={selectedCadett} setSelectedCadett={setSelectedCadett} handleNavigateCadett={handleNavigateCadett} handleDeletetCadett={handleDeletetCadett} isEditingName={isEditingName} setIsEditingName={setIsEditingName} editVorname={editVorname} setEditVorname={setEditVorname} editNachname={editNachname} setEditNachname={setEditNachname} handleUpdateName={handleUpdateName} toggleDSGVO={toggleDSGVO} toggleEmpfang={toggleEmpfang} kommentarText={kommentarText} setKommentarText={setKommentarText} kommentarGespeichert={kommentarGespeichert} setKommentarGespeichert={setKommentarGespeichert} handleSaveKommentar={handleSaveKommentar} ausgaben={ausgaben} handleRueckgabe={handleRueckgabe} setActiveKategorie={setActiveKategorie} setShowAusgabeModal={setShowAusgabeModal} generateAndSharePDF={(c, a) => generateAndSharePDF(c, a, inventar, logAction)}
-        />
+      {/* OPTIMIERTER CADETTEN-BEREICH (Nur noch 1 Block Abfrage!) */}
+      {view === 'cadetten' && (
+        !selectedCadett ? (
+          <CadettenListe 
+            cadetten={cadetten}
+            allAusgaben={allAusgaben}
+            setSelectedCadett={setSelectedCadett}
+            newVorname={newVorname}
+            setNewVorname={setNewVorname}
+            newNachname={newNachname}
+            setNewNachname={setNewNachname}
+            handleAddCadett={handleAddCadett}
+          />
+        ) : (
+          <CadettDetail 
+            selectedCadett={selectedCadett} 
+            setSelectedCadett={setSelectedCadett} 
+            handleNavigateCadett={handleNavigateCadett} 
+            handleDeletetCadett={handleDeletetCadett} 
+            isEditingName={isEditingName} 
+            setIsEditingName={setIsEditingName} 
+            editVorname={editVorname} 
+            setEditVorname={setEditVorname} 
+            editNachname={editNachname} 
+            setEditNachname={setEditNachname} 
+            handleUpdateName={handleUpdateName} 
+            toggleDSGVO={toggleDSGVO} 
+            toggleEmpfang={toggleEmpfang} 
+            kommentarText={kommentarText} 
+            setKommentarText={setKommentarText} 
+            kommentarGespeichert={kommentarGespeichert} 
+            setKommentarGespeichert={setKommentarGespeichert} 
+            handleSaveKommentar={handleSaveKommentar} 
+            ausgaben={ausgaben} 
+            handleRueckgabe={handleRueckgabe} 
+            setActiveKategorie={setActiveKategorie} 
+            setShowAusgabeModal={setShowAusgabeModal} 
+            generateAndSharePDF={(c, a) => generateAndSharePDF(c, a, inventar, logAction)}
+            onUpdateCadettField={onUpdateCadettField}
+          />
+        )
       )}
 
       {view === 'inventar' && (
         <InventarTab 
-          inventar={inventar} newArtikelKat={newArtikelKat} setNewArtikelKat={setNewArtikelKat} newGroesse={newGroesse} setNewGroesse={setNewGroesse} newZustand={newZustand} setNewZustand={setNewZustand} handleAddInventar={handleAddInventar} lagerFilter={lagerFilter} setLagerFilter={setLagerFilter} setLagerFilter={setLagerFilter} groessenFilter={groessenFilter} setGroessenFilter={setGroessenFilter} zustandFilter={zustandFilter} setZustandFilter={setZustandFilter} existierendeGroessen={['Alle', ...new Set(inventar.map(i => i.groesse?.trim()).filter(Boolean))].sort()} existierendeZustaende={['Alle', ...new Set(inventar.map(i => i.zustand?.trim()).filter(Boolean))].sort()}
+          inventar={inventar} newArtikelKat={newArtikelKat} setNewArtikelKat={setNewArtikelKat} newGroesse={newGroesse} setNewGroesse={setNewGroesse} newZustand={newZustand} setNewZustand={setNewZustand} handleAddInventar={handleAddInventar} lagerFilter={lagerFilter} setLagerFilter={setLagerFilter} groessenFilter={groessenFilter} setGroessenFilter={setGroessenFilter} zustandFilter={zustandFilter} setZustandFilter={setZustandFilter} existierendeGroessen={['Alle', ...new Set(inventar.map(i => i.groesse?.trim()).filter(Boolean))].sort()} existierendeZustaende={['Alle', ...new Set(inventar.map(i => i.zustand?.trim()).filter(Boolean))].sort()}
         />
       )}
 
