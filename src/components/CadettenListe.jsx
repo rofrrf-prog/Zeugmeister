@@ -171,14 +171,23 @@ export default function CadettenListe({
                 boxShadow: '0 2px 5px rgba(0,0,0,0.02)'
               }}
             >
-              <div style={{ flex: 1, minWidth: 0, paddingRight: '10px' }}>
-                <strong style={{ fontSize: '15px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {c.vorname} {c.nachname}
-                </strong>
-                <div style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px' }}>
-                  Ausrüstung: <span style={{ fontWeight: 'bold', color: istVollstaendig ? COLORS.statusGreen : COLORS.primaryRed }}>{`${anzahlAusgegeben} / ${sollAnzahl}`}</span>
-                </div>
-              </div>
+              {/* Linker Bereich: Name, Gruppen & Zähler */}
+<div style={{ flex: 1, minWidth: 0, paddingRight: '10px' }}>
+  <strong style={{ fontSize: '15px', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+    {c.vorname} {c.nachname}
+  </strong>
+  
+  {/* NEU: Gruppen-Anzeige direkt in der Liste */}
+  <div style={{ fontSize: '11px', color: COLORS.textMuted, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+    Formation: <span style={{ fontStyle: c.gruppen ? 'normal' : 'italic', color: c.gruppen ? COLORS.textDark : COLORS.textMuted }}>
+      {c.gruppen || 'Keine Gruppe'}
+    </span>
+  </div>
+
+  <div style={{ fontSize: '12px', color: COLORS.textMuted, marginTop: '2px' }}>
+    Ausrüstung: <span style={{ fontWeight: 'bold', color: istVollstaendig ? COLORS.statusGreen : COLORS.primaryRed }}>{`${anzahlAusgegeben} / ${sollAnzahl}`}</span>
+  </div>
+</div>
               
               <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                 <span style={{ fontSize: '10px', padding: '4px 8px', borderRadius: '10px', background: c.dsgvo_bestaetigt ? COLORS.statusGreenBg : '#FFF5F5', color: c.dsgvo_bestaetigt ? COLORS.statusGreen : COLORS.primaryRed, fontWeight: 'bold' }}>DSGVO</span>
