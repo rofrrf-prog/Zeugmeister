@@ -86,14 +86,25 @@ export default function CadettDetail({
             <button onClick={() => { setEditVorname(selectedCadett.vorname); setEditNachname(selectedCadett.nachname); setIsEditingName(true); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px' }}>✏️</button>
           </div>
         ) : (
-          <form onSubmit={handleUpdateName} style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '5px', background: COLORS.appBackground, borderRadius: '6px' }}>
+          <form onSubmit={handleUpdateName} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', background: COLORS.appBackground, borderRadius: '6px' }}>
+            {/* fontSize 16px verhindert Auto-Zoom bei iOS */}
             <div style={{ display: 'flex', gap: '6px' }}>
-              <input type="text" value={editVorname} onChange={e => setEditVorname(e.target.value)} style={{ flex: 1, padding: '6px', fontSize: '13px', borderRadius: '4px', border: `1px solid ${COLORS.borderLight}` }} />
-              <input type="text" value={editNachname} onChange={e => setEditNachname(e.target.value)} style={{ flex: 1, padding: '6px', fontSize: '13px', borderRadius: '4px', border: `1px solid ${COLORS.borderLight}` }} />
+              <input 
+                type="text" 
+                value={editVorname} 
+                onChange={e => setEditVorname(e.target.value)} 
+                style={{ flex: 1, padding: '8px', fontSize: '16px', borderRadius: '4px', border: `1px solid ${COLORS.borderLight}`, boxSizing: 'border-box' }} 
+              />
+              <input 
+                type="text" 
+                value={editNachname} 
+                onChange={e => setEditNachname(e.target.value)} 
+                style={{ flex: 1, padding: '8px', fontSize: '16px', borderRadius: '4px', border: `1px solid ${COLORS.borderLight}`, boxSizing: 'border-box' }} 
+              />
             </div>
             <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-              <button type="button" onClick={() => setIsEditingName(false)} style={{ padding: '4px 10px', fontSize: '11px', background: COLORS.pureWhite, border: `1px solid ${COLORS.borderLight}`, borderRadius: '4px', cursor: 'pointer' }}>Abbrechen</button>
-              <button type="submit" style={{ padding: '4px 10px', fontSize: '11px', background: COLORS.statusGreen, color: COLORS.pureWhite, border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>Speichern</button>
+              <button type="button" onClick={() => setIsEditingName(false)} style={{ padding: '6px 12px', fontSize: '12px', background: COLORS.pureWhite, border: `1px solid ${COLORS.borderLight}`, borderRadius: '4px', cursor: 'pointer' }}>Abbrechen</button>
+              <button type="submit" style={{ padding: '6px 12px', fontSize: '12px', background: COLORS.statusGreen, color: COLORS.pureWhite, border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>Speichern</button>
             </div>
           </form>
         )}
@@ -208,11 +219,21 @@ export default function CadettDetail({
         {/* Notizen */}
         <div style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
           <label style={{ fontSize: '11px', fontWeight: 'bold', color: COLORS.textMuted }}>✍️ Interne Notizen / Änderungen:</label>
+          {/* fontSize 16px verhindert Auto-Zoom bei iOS beim Tippen von Kommentaren */}
           <textarea 
             value={kommentarText} 
             onChange={e => { setKommentarText(e.target.value); setKommentarGespeichert(false); }} 
             placeholder="Besonderheiten eintragen (z.B. Hose gekürzt)..."
-            style={{ width: '100%', minHeight: '70px', padding: '8px', borderRadius: '6px', border: `1px solid ${kommentarGespeichert ? COLORS.borderLight : COLORS.warningOrange}`, fontSize: '13px', boxSizing: 'border-box', fontFamily: 'sans-serif' }}
+            style={{ 
+              width: '100%', 
+              minHeight: '70px', 
+              padding: '10px', 
+              borderRadius: '6px', 
+              border: `1px solid ${kommentarGespeichert ? COLORS.borderLight : COLORS.warningOrange}`, 
+              fontSize: '16px', 
+              boxSizing: 'border-box', 
+              fontFamily: 'sans-serif' 
+            }}
           />
           {!kommentarGespeichert && (
             <button onClick={handleSaveKommentar} style={{ alignSelf: 'flex-end', background: COLORS.warningOrange, color: COLORS.pureWhite, border: 'none', padding: '6px 12px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}>Notiz speichern</button>
