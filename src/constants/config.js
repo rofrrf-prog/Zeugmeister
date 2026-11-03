@@ -1,30 +1,53 @@
-export const SOLL_KATEGORIEN = ['Hut', 'Barret', 'Uniformjacke', 'Schulterstücke', 'Koppel', 'Mantel', 'Rock', 'Stiefel'];
+/**
+ * Globale Kategorien für alle theoretisch existierenden Ausrüstungsteile.
+ * Wichtig: Hier muss die Schreibweise exakt mit der Datenbank und der Wunsch-Reihenfolge übereinstimmen!
+ */
+export const SOLL_KATEGORIEN = [
+  'Hut', 
+  'Barett', // Korrigiert von 'Barret' auf 'Barett'
+  'Uniformjacke', 
+  'Schulterstücke', 
+  'Koppel', 
+  'Mantel', 
+  'Rock', 
+  'Stiefel'
+];
+
+/**
+ * Liste der autorisierten Betreuer, die Aktionen in der App durchführen dürfen.
+ */
 export const BETREUER_LISTE = ['Anja', 'Claudia', 'Ronny', 'Simone', 'Tina']; 
 
+/**
+ * Zentrales Farb-Schema für das Design der App (Corporate Identity).
+ */
 export const COLORS = {
-  primaryRed: '#C41230',        
-  primaryRedHover: '#A00F26',   
-  softRedBg: '#FDF2F4',         
-  pureWhite: '#FFFFFF',         
-  appBackground: '#F7FAFC',     
-  textDark: '#1A202C',          
-  textMuted: '#718096',         
-  borderLight: '#E2E8F0',       
-  statusGreen: '#319795',       
-  statusGreenBg: '#E6FFFA',     
-  warningOrange: '#DD6B20',     
-  warningOrangeBg: '#FFFAF0'    
+  primaryRed: '#C41230',        // Hauptfarbe der Ehrengarde
+  primaryRedHover: '#A00F26',   // Hover-Effekt für rote Buttons
+  softRedBg: '#FDF2F4',         // Sanfter roter Hintergrund für Badges/Meldungen
+  pureWhite: '#FFFFFF',         // Kontrastweiß
+  appBackground: '#F7FAFC',     // Heller, augenfreundlicher Seitenhintergrund
+  textDark: '#1A202C',          // Gut lesbarer, dunkler Text (nahezu Schwarz)
+  textMuted: '#718096',         // Dezenter Grauton für sekundäre Texte
+  borderLight: '#E2E8F0',       // Rahmen und Trennlinien
+  statusGreen: '#319795',       // Erfolg / Vollständig / DSGVO erteilt
+  statusGreenBg: '#E6FFFA',     // Hintergrund für grüne Badges
+  warningOrange: '#DD6B20',     // Warnungen / Unvollständige Quittungen
+  warningOrangeBg: '#FFFAF0'    // Hintergrund für orangefarbene Badges
 };
 
 /**
  * Berechnet die exakte Soll-Ausrüstungsliste für einen Cadetten
- * und sortiert sie nach einer fest vorgegebenen Wunsch-Reihenfolge.
+ * basierend auf Geschlecht und zugeordneten Gruppen (Formationen)
+ * und sortiert diese nach einer fest vorgegebenen Wunsch-Reihenfolge.
+ * * @param {Object} cadett - Das Cadetten-Objekt aus der Datenbank
+ * @returns {Array<string>} - Array der benötigten Ausrüstungskategorien in korrekter Sortierung
  */
 export function getSollKategorienFuerCadett(cadett) {
   if (!cadett) return [];
 
-  // --- 1. DEINE WUNSCH-REIHENFOLGE ---
-  // Ändere einfach die Sortierung in diesem Array, um die Anzeige in der App zu steuern!
+  // --- 1. DIE GEWÜNSCHTE ANZEIGE-REIHENFOLGE ---
+  // Diese Reihenfolge bestimmt, wie die Teile im UI und auf dem PDF-Beleg sortiert werden.
   const WUNSCH_REIHENFOLGE = [
     'Hut',
     'Barett',
@@ -36,26 +59,31 @@ export function getSollKategorienFuerCadett(cadett) {
     'Stiefel'
   ];
 
-  // 2. Unsortierte Sammlung aller benötigten Gegenstände
+  // --- 2. BASIS-AUSRÜSTUNG (Für jeden Cadetten identisch) ---
   let benoetigteTeile = ['Uniformjacke', 'Schulterstücke', 'Mantel', 'Stiefel'];
 
-  // Geschlechtsspezifische Teile hinzufügen
+  // --- 3. GESCHLECHTSSPEZIFISCHE TEILE ---
   if (cadett.geschlecht === 'w') {
+    // Mädchen erhalten zusätzlich Hut, Barett und Rock
     benoetigteTeile.push('Hut', 'Barett', 'Rock');
   } else {
+    // Jungs erhalten standardmäßig nur den Hut als Kopfbedeckung
     benoetigteTeile.push('Hut');
   }
 
-  // Koppel-Logik (nur für Pänz oder Cadetten)
+  // --- 4. KOPPEL-LOGIK ---
+  // Nur Mitglieder der 'Pänz' oder 'Cadetten' benötigen eine Koppel.
+  // Das Feld 'gruppen' in der DB ist ein kommagetrennter String.
   const gruppenArray = cadett.gruppen 
     ? cadett.gruppen.split(',').map(g => g.trim()).filter(Boolean) 
     : [];
+    
   if (gruppenArray.includes('Pänz') || gruppenArray.includes('Cadetten')) {
     benoetigteTeile.push('Koppel');
   }
 
-  // --- 3. DIE SORTIERUNG ---
-  // Wir filtern die Wunsch-Reihenfolge so, dass nur die Teile übrig bleiben,
-  // die das Kind heute auch wirklich erhalten soll.
+  // --- 5. SORTIERUNG & FILTERUNG ---
+  // Wir filtern die globale Wunsch-Reihenfolge, sodass nur die Teile übrig bleiben,
+  // die der Cadett laut obigen Regeln tatsächlich benötigt.
   return WUNSCH_REIHENFOLGE.filter(teil => benoetigteTeile.includes(teil));
 }
